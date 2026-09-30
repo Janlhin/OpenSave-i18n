@@ -1,0 +1,392 @@
+package cliapp
+
+import (
+	"encoding/json"
+	"fmt"
+	"os"
+	"path/filepath"
+	"strings"
+
+	"github.com/opensave/opensave/internal/daemon"
+	"github.com/opensave/opensave/internal/selfupdate"
+	"github.com/opensave/opensave/internal/store"
+	"github.com/opensave/opensave/internal/version"
+)
+
+// Settings and game-linking management, so a headless install isn't forced
+// back to the desktop app to change how scanning or matching behaves.
+
+// cmdExclude manages the folders auto-scan skips.
+func cmdExclude(d *daemon.Daemon, args []string) int {
+	asJSON, args := jsonFlag(args)
+	if len(args) == 0 {
+		fmt.Fprintln(os.Stderr, excludeUsage)
+		return 1
+	}
+
+	settings, err := d.Store.GetSettings()
+	if err != nil {
+		return fail(asJSON, err)
+	}
+
+	switch args[0] {
+	case "list":
+		if asJSON {
+			paths := settings.ExcludePaths
+			if paths == nil {
+				paths = []string{}
+			}
+			return emitJSON(paths)
+		}
+		if len(settings.ExcludePaths) == 0 {
+			fmt.Println("No excluded folders. Auto-scan looks everywhere it knows about.")
+			return 0
+		}
+		fmt.Printf("%s:\n\n", plural(len(settings.ExcludePaths), "excluded folder", "excluded folders"))
+		for _, p := range settings.ExcludePaths {
+			fmt.Printf("  %s\n", p)
+		}
+		return 0
+
+	case "add":
+		if len(args) < 2 {
+			fmt.Fprintln(os.Stderr, "usage: opensave exclude add <path>")
+			return 1
+		}
+		abs, err := filepath.Abs(args[1])
+		if err != nil {
+			return fail(asJSON, err)
+		}
+		for _, existing := range settings.ExcludePaths {
+			if strings.EqualFold(existing, abs) {
+				if asJSON {
+					return emitJSON(map[string]any{"added": false, "reason": "already excluded"})
+				}
+				fmt.Printf("%s is already excluded.\n", abs)
+				return 0
+			}
+		}
+		settings.ExcludePaths = append(settings.ExcludePaths, abs)
+		if err := d.Store.UpdateSettings(settings); err != nil {
+			return fail(asJSON, err)
+		}
+		if asJSON {
+			return emitJSON(map[string]any{"added": true, "path": abs})
+		}
+		fmt.Printf("Auto-scan will skip %s\n", abs)
+		return 0
+
+	case "remove":
+		if len(args) < 2 {
+			fmt.Fprintln(os.Stderr, "usage: opensave exclude remove <path>")
+			return 1
+		}
+		abs, _ := filepath.Abs(args[1])
+		kept := settings.ExcludePaths[:0:0]
+		removed := false
+		for _, p := range settings.ExcludePaths {
+			if strings.EqualFold(p, abs) || strings.EqualFold(p, args[1]) {
+				removed = true
+				continue
+			}
+			kept = append(kept, p)
+		}
+		if !removed {
+			return fail(asJSON, fmt.Errorf("%q isn't in the exclude list", args[1]))
+		}
+		settings.ExcludePaths = kept
+		if err := d.Store.UpdateSettings(settings); err != nil {
+			return fail(asJSON, err)
+		}
+		if asJSON {
+			return emitJSON(map[string]any{"removed": true, "path": args[1]})
+		}
+		fmt.Printf("No longer excluding %s\n", args[1])
+		return 0
+
+	default:
+		fmt.Fprintln(os.Stderr, excludeUsage)
+		return 1
+	}
+}
+
+const excludeUsage = `usage:
+  opensave exclude list            Folders auto-scan skips
+  opensave exclude add <path>      Skip a folder (and everything inside it)
+  opensave exclude remove <path>   Stop skipping it`
+
+// cmdLink merges one tracked game into another so both ids sync to the same
+// save — the same title tracked under different names on two machines.
+func cmdLink(d *daemon.Daemon, args []string) int {
+	asJSON, args := jsonFlag(args)
+	if len(args) < 2 {
+		fmt.Fprintln(os.Stderr,
+			"usage: opensave link <gameId> <otherGameId>\n"+
+				"  Treats both as the same game. <otherGameId> is merged in and\n"+
+				"  removed from the library; its save files are left alone.")
+		return 1
+	}
+	canonical, alias := args[0], args[1]
+	if err := d.LinkGames(canonical, alias); err != nil {
+		return fail(asJSON, err)
+	}
+	if asJSON {
+		return emitJSON(map[string]any{"canonical": canonical, "alias": alias})
+	}
+	fmt.Printf("Linked: %q now also answers to %q.\n", canonical, alias)
+	return 0
+}
+
+// cmdUnlinkGame removes a link, restoring the merged game as its own entry.
+func cmdUnlinkGame(d *daemon.Daemon, args []string) int {
+	asJSON, args := jsonFlag(args)
+	if len(args) < 1 {
+		fmt.Fprintln(os.Stderr, "usage: opensave unlink <aliasGameId>")
+		return 1
+	}
+	if err := d.UnlinkGame(args[0]); err != nil {
+		return fail(asJSON, err)
+	}
+	if asJSON {
+		return emitJSON(map[string]any{"unlinked": args[0]})
+	}
+	fmt.Printf("Unlinked %q — it's tracked separately again.\n", args[0])
+	return 0
+}
+
+// cmdLinks lists the aliases pointing at a game.
+func cmdLinks(d *daemon.Daemon, args []string) int {
+	asJSON, args := jsonFlag(args)
+	if len(args) < 1 {
+		fmt.Fprintln(os.Stderr, "usage: opensave links <gameId>")
+		return 1
+	}
+	// Confirm the game exists first. Listing aliases for an id nobody tracks
+	// returns an empty set, which printed as "no other game is linked" and
+	// exited 0 — a typo read back as a confirmed answer, and every sibling
+	// command rejects an unknown id instead.
+	if _, err := d.Store.GetGame(args[0]); err != nil {
+		return fail(asJSON, unknownGameError(d, args[0], err))
+	}
+	aliases, err := d.Store.ListGameAliases(args[0])
+	if err != nil {
+		return fail(asJSON, err)
+	}
+	if asJSON {
+		if aliases == nil {
+			aliases = []string{}
+		}
+		return emitJSON(aliases)
+	}
+	if len(aliases) == 0 {
+		fmt.Printf("No other game is linked to %q.\n", args[0])
+		return 0
+	}
+	fmt.Printf("%q is also known as:\n\n", args[0])
+	for _, a := range aliases {
+		fmt.Printf("  %s\n", a)
+	}
+	return 0
+}
+
+// cmdConfig reads and writes daemon settings, so a headless box can be
+// configured without the desktop app.
+func cmdConfig(d *daemon.Daemon, args []string) int {
+	asJSON, args := jsonFlag(args)
+	settings, err := d.Store.GetSettings()
+	if err != nil {
+		return fail(asJSON, err)
+	}
+
+	if len(args) == 0 || args[0] == "list" {
+		if asJSON {
+			return emitJSON(settings)
+		}
+		fmt.Printf("device name:      %s\n", settings.DeviceName)
+		fmt.Printf("port:             %d\n", settings.Port)
+		fmt.Printf("relay:            %s\n", settings.RelayURL)
+		fmt.Printf("relay room:       %s\n", orNone(settings.SyncCode))
+		fmt.Printf("match by app id:  %v\n", settings.MatchByAppID)
+		fmt.Printf("unknown game:     %s\n", unknownGameLabel(settings.UnknownGameFromPeer))
+		fmt.Printf("snapshot limit:   %d\n", settings.DefaultMaxSnapshots)
+		fmt.Printf("manual limit:     %s\n", manualLimitLabel(settings.DefaultMaxManualSnapshots))
+		fmt.Printf("update channel:   %s\n", updateChannelLabel(settings.UpdateChannel))
+		fmt.Printf("check snapshots:  %s\n", verifyEveryLabel(settings.VerifyEveryDays))
+		fmt.Printf("data dir:         %s\n", settings.DataDir)
+		fmt.Printf("snapshots dir:    %s\n", settings.BackupsDir)
+		return 0
+	}
+
+	if args[0] != "set" || len(args) < 3 {
+		fmt.Fprintln(os.Stderr, configUsage)
+		return 1
+	}
+
+	key, value := args[1], args[2]
+	switch key {
+	case "device-name":
+		settings.DeviceName = value
+	case "match-by-app-id":
+		settings.MatchByAppID = value == "true" || value == "yes" || value == "1"
+	case "unknown-game-from-peer":
+		// Rejected rather than coerced. The two answers do materially different
+		// things — one starts syncing a game, the other waits for a person —
+		// and quietly reading a typo as "track" would be the wrong way round
+		// for anyone who typed this deliberately to stop guessing.
+		switch value {
+		case store.UnknownGameTrack, store.UnknownGameAsk:
+			settings.UnknownGameFromPeer = value
+		default:
+			return fail(asJSON, fmt.Errorf(
+				"unknown-game-from-peer must be %q (work out a folder and start syncing) "+
+					"or %q (wait for someone to choose one)",
+				store.UnknownGameTrack, store.UnknownGameAsk))
+		}
+	case "snapshot-limit":
+		var n int
+		if _, err := fmt.Sscanf(value, "%d", &n); err != nil || n < 0 {
+			return fail(asJSON, fmt.Errorf("snapshot-limit must be a non-negative number"))
+		}
+		settings.DefaultMaxSnapshots = n
+	case "manual-snapshot-limit":
+		var n int
+		if _, err := fmt.Sscanf(value, "%d", &n); err != nil || n < 0 {
+			return fail(asJSON, fmt.Errorf("manual-snapshot-limit must be a non-negative number (0 keeps them forever)"))
+		}
+		settings.DefaultMaxManualSnapshots = n
+	case "port":
+		// Settable at last. `daemon start --port` only ever covered one run,
+		// and the field in the window is no use on a headless box — so a
+		// machine where 8383 was taken had no durable way to move off it.
+		var n int
+		if _, err := fmt.Sscanf(value, "%d", &n); err != nil || n < 1 || n > 65535 {
+			return fail(asJSON, fmt.Errorf("port must be a number from 1 to 65535"))
+		}
+		settings.Port = n
+	case "relay-url":
+		// Refused rather than silently ignored: the write would be accepted,
+		// the next read would return the environment's value anyway, and the
+		// setting would look broken instead of overridden.
+		if settings.RelayURLLocked {
+			return fail(asJSON, fmt.Errorf(
+				"relay-url is pinned to %q by the %s environment variable, so it cannot be changed here.\n"+
+					"Change the variable and restart OpenSave, or unset it to go back to the stored setting.",
+				settings.RelayURL, store.RelayURLEnv))
+		}
+		// A relay carries the save file itself, and nothing in OpenSave
+		// encrypts it — so ws:// to a public host is the save on the wire in
+		// the clear. Caught here rather than at the dial, where it would look
+		// like a connection problem.
+		if err := store.ValidateRelayURL(value); err != nil {
+			return fail(asJSON, err)
+		}
+		settings.RelayURL = value
+	case "verify-every":
+		// How often every snapshot is read back to check it can be restored.
+		switch strings.ToLower(value) {
+		case "off", "never", "0":
+			settings.VerifyEveryDays = 0
+		default:
+			var n int
+			if _, err := fmt.Sscanf(value, "%d", &n); err != nil || n < 1 || n > 365 {
+				return fail(asJSON, fmt.Errorf("verify-every is a number of days from 1 to 365, or \"off\""))
+			}
+			settings.VerifyEveryDays = n
+		}
+	case "update-channel":
+		switch strings.ToLower(value) {
+		case "stable", "beta":
+			settings.UpdateChannel = strings.ToLower(value)
+		default:
+			return fail(asJSON, fmt.Errorf("update-channel must be \"stable\" or \"beta\""))
+		}
+	default:
+		return fail(asJSON, fmt.Errorf("unknown setting %q\n\n%s", key, configUsage))
+	}
+
+	if err := d.Store.UpdateSettings(settings); err != nil {
+		return fail(asJSON, err)
+	}
+	if asJSON {
+		return emitJSON(map[string]any{"set": key, "value": value})
+	}
+	fmt.Printf("%s = %s\n", key, value)
+	if daemonRunning() {
+		fmt.Println("Restart the daemon for this to take effect.")
+	}
+	return 0
+}
+
+const configUsage = `usage:
+  opensave config [list]                    Show current settings
+  opensave config set device-name <name>    How other devices see this one
+  opensave config set match-by-app-id <t/f> Link same-App-ID games across devices
+  opensave config set unknown-game-from-peer <track|ask>
+                                            Another device syncs a game this one
+                                            lacks: work out a folder and start
+                                            (default), or wait to be told where
+  opensave config set snapshot-limit <n>    Automatic snapshots kept per branch (0 = all)
+  opensave config set manual-snapshot-limit <n>
+                                            Manual snapshots kept per branch (0 = keep forever)
+  opensave config set port <n>              Local API/peer port (default 8383)
+  opensave config set relay-url <url>       Relay server for internet sync
+  opensave config set update-channel <stable|beta>
+                                            Whether updates include pre-releases
+  opensave config set verify-every <days|off>
+                                            How often every snapshot is checked
+                                            it can be restored (default 7)`
+
+// manualLimitLabel renders the manual-snapshot budget. 0 is the default and
+// means "never pruned", which is worth saying in words — printing a bare 0
+// next to "snapshot limit: 20" reads like manual snapshots are disabled.
+func manualLimitLabel(n int) string {
+	if n <= 0 {
+		return "keep forever"
+	}
+	return fmt.Sprintf("%d", n)
+}
+
+// updateChannelLabel spells out what the stored channel means, and says when a
+// pre-release build has overridden it — otherwise `config list` would report
+// "stable" on a machine that is being offered betas.
+func updateChannelLabel(channel string) string {
+	if selfupdate.WantsPreReleases(channel, version.Version) && !strings.EqualFold(channel, "beta") {
+		return "beta (this is a pre-release build)"
+	}
+	if strings.EqualFold(channel, "beta") {
+		return "beta"
+	}
+	return "stable"
+}
+
+func orNone(s string) string {
+	if s == "" {
+		return "(none)"
+	}
+	return s
+}
+
+var _ = json.Marshal // settings marshal through emitJSON
+
+// unknownGameLabel describes the policy in the words the setting means, rather
+// than echoing a stored token. "track" on its own reads as a noun.
+func unknownGameLabel(v string) string {
+	if (store.Settings{UnknownGameFromPeer: v}).ShouldAskBeforeTracking() {
+		return "ask where to keep it"
+	}
+	return "track it automatically"
+}
+
+// verifyEveryLabel says how often snapshots are checked.
+func verifyEveryLabel(days int) string {
+	switch {
+	case days <= 0:
+		return "never"
+	case days == 1:
+		return "every day"
+	case days == 7:
+		return "every week"
+	default:
+		return fmt.Sprintf("every %d days", days)
+	}
+}

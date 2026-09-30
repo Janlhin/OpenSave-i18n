@@ -1,0 +1,1292 @@
+// Package daemon wires OpenSave's subsystems together: storage (with
+// legacy import on first launch), the snapshot manager, the file watcher,
+// and the local REST/WebSocket API. P2P and cloud attach here in later
+// phases.
+package daemon
+
+import (
+	"context"
+	"errors"
+	"fmt"
+	"os"
+	"path/filepath"
+	"strconv"
+	"strings"
+	"sync"
+	"time"
+
+	"github.com/opensave/opensave/internal/cloud"
+	"github.com/opensave/opensave/internal/config"
+	"github.com/opensave/opensave/internal/delta"
+	"github.com/opensave/opensave/internal/drain"
+	"github.com/opensave/opensave/internal/logging"
+	"github.com/opensave/opensave/internal/p2p"
+	"github.com/opensave/opensave/internal/p2p/syncengine"
+	"github.com/opensave/opensave/internal/presets"
+	"github.com/opensave/opensave/internal/snapshot"
+	"github.com/opensave/opensave/internal/store"
+	"github.com/opensave/opensave/internal/store/legacyimport"
+	"github.com/opensave/opensave/internal/switchtitle"
+	"github.com/opensave/opensave/internal/watcher"
+)
+
+// Options tune daemon construction; the zero value is production behavior.
+type Options struct {
+	// HomeOverride uses a custom data directory instead of ~/.opensave
+	// (tests and portable installs).
+	HomeOverride string
+	// DisableDiscovery skips UDP LAN discovery (tests pair peers manually
+	// and don't want broadcast traffic).
+	DisableDiscovery bool
+}
+
+// Daemon is the assembled core. Access subsystems directly for operations
+// (d.Store, d.Snapshots, ...).
+type Daemon struct {
+	Paths     config.Paths
+	Store     *store.Store
+	Snapshots *snapshot.Manager
+	Watcher   *watcher.Engine
+	Scanner   *presets.Scanner
+	P2P       *p2p.Engine
+	Cloud     *cloud.Service
+	Log       *logging.Logger
+
+	opts Options
+
+	// OnGameChanged fires after a watcher-triggered auto-snapshot (in
+	// addition to the built-in P2P sync kick). May be reassigned before
+	// Start.
+	OnGameChanged func(gameID string)
+
+	// Games whose save folder is not there; see missing.go.
+	missingMu sync.Mutex
+	missing   map[string]bool
+
+	// Play sessions; see sessions.go.
+	sessions sessionState
+
+	// OnCloudOffers receives the saves from other devices' cloud backups
+	// that are waiting for an answer, whenever that list changes, and
+	// OnCloudPulled each one put in place without asking. See cloudsync.go.
+	OnCloudOffers func([]CloudOffer)
+	OnCloudPulled func(CloudPulled)
+	cloudRd       cloudReader
+
+	// OnNewGames receives the newly installed games the background scan has
+	// found and nobody has looked at yet, whenever that list changes. See
+	// newgames.go.
+	OnNewGames func([]NewGame)
+	newGames   newGameState
+	// scanMu runs one save scan at a time. See ScanForSaves.
+	scanMu sync.Mutex
+
+	// uploads counts cloud mirrors still running, so Stop can wait for them
+	// rather than letting process exit truncate one.
+	uploads drain.Group
+
+	// held are the cloud copies of snapshots taken while syncing was paused,
+	// sent when it resumes. See pause.go.
+	heldMu sync.Mutex
+	// compactMu runs one compaction pass at a time; see compact.go.
+	compactMu sync.Mutex
+	held      []heldUpload
+
+	// initialSnapshots counts the first-snapshot goroutines TrackGame starts.
+	// They run in the background so the API can answer immediately, which is
+	// right for the desktop app and wrong for the CLI: `opensave add` returns
+	// and the process exits, taking the unfinished snapshot with it. The game
+	// ended up tracked with no history at all, and nothing said so — the one
+	// snapshot you would most want is the state before you started playing.
+	initialSnapshots drain.Group
+}
+
+// New builds the daemon: resolves paths, runs the one-time legacy JSON
+// import if needed, opens the store, and constructs (but does not start)
+// the subsystems.
+func New(opts Options) (*Daemon, error) {
+	var paths config.Paths
+	var err error
+	if opts.HomeOverride != "" {
+		paths, err = config.ResolveAt(opts.HomeOverride)
+	} else {
+		paths, err = config.Resolve()
+	}
+	if err != nil {
+		return nil, fmt.Errorf("resolve paths: %w", err)
+	}
+
+	// Mirror the activity log to disk from the very first step so failures
+	// that never reach the dashboard (boot problems, unreachable API) stay
+	// diagnosable — the dashboard only exists once boot succeeds.
+	log := logging.New()
+	log.AttachFile(filepath.Join(paths.HomeDir, "opensave.log"))
+	log.Log("info", "daemon starting (data dir: "+paths.HomeDir+")")
+	fail := func(err error) (*Daemon, error) {
+		log.Log("error", "daemon boot failed: "+err.Error())
+		log.Close()
+		return nil, err
+	}
+
+	if legacyimport.Needed(paths.LegacyDB, paths.SQLiteDB) {
+		if err := legacyimport.Run(paths.LegacyDB, paths.SQLiteDB, paths.MigrationLog); err != nil {
+			return fail(fmt.Errorf("legacy database import failed (your JSON data is untouched): %w", err))
+		}
+	}
+
+	s, err := store.Open(paths.SQLiteDB)
+	if err != nil {
+		return fail(fmt.Errorf("open store: %w", err))
+	}
+	if err := s.EnsureDefaultSettings(paths.HomeDir, paths.BackupsDir); err != nil {
+		s.Close()
+		return fail(fmt.Errorf("initialize settings: %w", err))
+	}
+
+	snaps := snapshot.New(s)
+	snaps.Log = log.Log
+
+	d := &Daemon{
+		Paths:     paths,
+		Store:     s,
+		Snapshots: snaps,
+		Log:       log,
+		Scanner:   presets.NewScanner(paths.AppCacheFile),
+		P2P:       p2p.New(s, snaps, log.Log),
+		Cloud:     cloud.New(s, log.Log),
+		opts:      opts,
+	}
+
+	d.initSessions()
+
+	// A restore or a branch switch rewrites a save folder; nothing syncing it
+	// may read it half-way (syncengine/settle.go).
+	snaps.WriteGate = d.P2P.Sync.Writing
+
+	// A paired peer untracking/re-tracking a game mirrors here.
+	d.P2P.OnUntrackRequest = d.untrackFromPeer
+	d.P2P.OnRetrackRequest = d.retrackFromPeer
+	// A Switch save a peer syncs goes into this device's own emulator profile.
+	d.P2P.SwitchSaveFolder = d.Scanner.SwitchSaveFolder
+
+	// Every new snapshot mirrors to the configured cloud provider in the
+	// background; failures are logged, never fatal.
+	snaps.OnUpload = func(zipPath, remoteFileName string) {
+		// Tracked so Stop can wait for it. In a short-lived process —
+		// `opensave snapshot`, or the automatic backup taken by rollback and
+		// checkout — the process would otherwise exit before the copy
+		// finishes. The destination file has already been created and
+		// truncated by then, so what is left in the cloud is a zero-byte
+		// archive that looks like a backup. `cloud push` then skips it,
+		// because a file of that name exists, so it is never repaired.
+		// Reproduced with a local folder provider: of five snapshots taken in
+		// sequence, the last two uploaded as 0 bytes.
+		//
+		// Counted here, on the caller's goroutine, and only then moved to the
+		// background, so that Stop, once it has seen the snapshot finish,
+		// also sees its upload.
+		if d.P2P.Pause.Paused() {
+			d.holdUpload(zipPath, remoteFileName)
+			return
+		}
+		d.uploads.Add()
+		go d.runCloudUpload(zipPath, remoteFileName, log)
+	}
+	d.P2P.Pause.OnResume(d.catchUpAfterPause)
+	// Which snapshot is each game's save, for reading the mirror back.
+	snaps.OnCreated = d.noteSnapshotForCloud
+	snaps.OnRestored = d.noteRestoreForCloud
+
+	d.Watcher = watcher.New(watcher.Callbacks{
+		IgnoreRules: func(gameID string) string {
+			game, err := s.GetGame(gameID)
+			if err != nil {
+				return ""
+			}
+			return game.SyncIgnore
+		},
+		GetLastManifestHash: func(gameID string) (string, error) {
+			game, err := s.GetGame(gameID)
+			if err != nil {
+				return "", err
+			}
+			return game.LastManifestHash, nil
+		},
+		SetLastManifestHash: s.SetLastManifestHash,
+		CreateSnapshot: func(gameID string) error {
+			_, err := snaps.Create(gameID, "", true)
+			return err
+		},
+		OnChanged: func(gameID string) {
+			// An emptied save is noticed as it happens, and said on screen,
+			// even with no other device online to hold it back from.
+			_, _ = d.P2P.Sync.CheckHold(gameID, false)
+			// Watcher-detected save change: push it to online peers. Bound to
+			// the P2P engine's lifecycle so shutdown cancels a transfer in
+			// flight instead of leaving it writing into the save folder.
+			d.P2P.GoSync(func(ctx context.Context) {
+				ctx, cancel := context.WithTimeout(ctx, 10*time.Minute)
+				defer cancel()
+				if _, err := d.P2P.SyncGame(ctx, gameID); err != nil && !errors.Is(err, syncengine.ErrPaused) && !errors.Is(err, syncengine.ErrHeld) {
+					d.Log.Log("info", fmt.Sprintf("post-snapshot sync for %s: %v", gameID, err))
+				}
+			})
+			if d.OnGameChanged != nil {
+				d.OnGameChanged(gameID)
+			}
+		},
+		Log: log.Log,
+	})
+
+	return d, nil
+}
+
+// Start begins watching every tracked game with auto-sync enabled.
+func (d *Daemon) Start() error {
+	// Deletion records expire. Swept once per launch rather than on a timer:
+	// the retention is measured in months, so anything finer is noise, and a
+	// stale record is what lets a long-deleted file come back.
+	if err := d.Store.PruneDeletedFiles(); err != nil {
+		d.Log.Log("warn", "could not expire old deletion records: "+err.Error())
+	}
+
+	games, err := d.Store.ListGames()
+	if err != nil {
+		return err
+	}
+	// Switch games tracked under a made-up name get their real one, when an
+	// emulator here knows it by now.
+	d.nameSwitchGames()
+
+	// Size the manifest hash cache to the library. A fixed budget is either
+	// wasteful for someone with ten games or too small for someone with three
+	// hundred — and too small is the expensive direction, because the cache
+	// then evicts entries it is about to want and starts re-reading saves.
+	delta.SetHashCacheBudgetForGames(len(games))
+
+	for _, game := range games {
+		// Backfill cover art for games tracked before covers existed (or
+		// migrated from the JS app without one).
+		if game.CoverURL == "" {
+			if cover := SteamCoverURL(game.AppID); cover != "" {
+				game.CoverURL = cover
+				_ = d.Store.UpdateGame(game)
+			}
+		}
+		if !game.AutoSync {
+			continue
+		}
+		if err := d.watchGame(game.ID, game.SavePath); err != nil {
+			if errors.Is(err, watcher.ErrSaveFolderMissing) {
+				d.noteMissing(game.ID, game.Name, game.SavePath, true)
+				continue
+			}
+			d.Log.Log("warn", fmt.Sprintf("could not watch %q: %v", game.Name, err))
+		}
+	}
+	if !d.opts.DisableDiscovery {
+		if err := d.P2P.StartDiscovery(); err != nil {
+			d.Log.Log("warn", fmt.Sprintf("LAN discovery unavailable: %v", err))
+		}
+	}
+
+	// Failsafe: automatically retry any game whose sync gets interrupted
+	// (e.g. the network drops mid-transfer) once peers are reachable again.
+	d.P2P.StartResyncLoop()
+
+	// Join the WAN relay room if a sync code is configured (no-op without one).
+	d.P2P.Wan.Connect()
+
+	// Host an in-process relay if enabled.
+	if settings, err := d.Store.GetSettings(); err == nil {
+		d.P2P.ApplyRelayHosting(settings.HostRelay, settings.RelayPort)
+	}
+
+	// Keep the watch set honest.
+	//
+	// Starting a watch is a one-shot: it happens when a game is tracked or
+	// when the daemon starts, and a failure was only ever logged. A save
+	// folder on a drive that mounts a few seconds after login, a folder
+	// briefly held by another process, a transient permission — any of those
+	// left that game watched by nobody for the rest of the session. No
+	// auto-snapshots, no sync on change, and nothing on screen to say so,
+	// because a watch that does not exist raises no events to reveal its
+	// absence.
+	//
+	// ResyncWatchers already knew how to fix this and was only ever called
+	// from an endpoint nothing in the app calls. Running it on a timer costs
+	// one query a minute and leaves existing watches strictly alone.
+	d.P2P.GoSync(func(ctx context.Context) {
+		ticker := time.NewTicker(watchResyncInterval)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-ticker.C:
+				d.ResyncWatchers()
+			}
+		}
+	})
+
+	// Age-based retention, when the setting asks for it. Once shortly after
+	// start — a machine that is on for an hour a day would otherwise never
+	// reach a daily tick — and then every few hours, which is plenty for a
+	// rule measured in days.
+	d.P2P.GoSync(func(ctx context.Context) {
+		first := time.NewTimer(oldSnapshotFirstSweep)
+		defer first.Stop()
+		select {
+		case <-ctx.Done():
+			return
+		case <-first.C:
+			d.PruneOldSnapshots()
+		}
+		ticker := time.NewTicker(oldSnapshotSweepInterval)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-ticker.C:
+				d.PruneOldSnapshots()
+			}
+		}
+	})
+
+	// Look for newly installed games: a few minutes after start, then every
+	// hour. See newgames.go.
+	d.P2P.GoSync(func(ctx context.Context) {
+		first := time.NewTimer(newGameFirstScan)
+		defer first.Stop()
+		select {
+		case <-ctx.Done():
+			return
+		case <-first.C:
+			d.DetectNewGames()
+		}
+		ticker := time.NewTicker(newGameScanInterval)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-ticker.C:
+				d.DetectNewGames()
+			}
+		}
+	})
+
+	// Notice which game is being played, and keep the save as each session
+	// leaves it. See sessions.go.
+	d.P2P.GoSync(d.runSessions)
+
+	// Check every snapshot can still be restored, daily. See verify.go.
+	d.P2P.GoSync(d.runVerify)
+
+	// Have older snapshots share the files they have in common, every few
+	// hours. See compact.go.
+	d.P2P.GoSync(d.runCompact)
+
+	// Read the cloud mirror back: shortly after start, which is "when I open
+	// the app", and every few minutes after. See cloudsync.go.
+	d.P2P.GoSync(func(ctx context.Context) {
+		first := time.NewTimer(cloudCheckDelay)
+		defer first.Stop()
+		select {
+		case <-ctx.Done():
+			return
+		case <-first.C:
+			d.CheckCloud()
+		}
+		ticker := time.NewTicker(cloudCheckInterval)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-ticker.C:
+				d.CheckCloud()
+			}
+		}
+	})
+
+	d.Log.Log("info", fmt.Sprintf("daemon started; watching %d game(s)", len(games)))
+	return nil
+}
+
+// oldSnapshotFirstSweep is how long after start the first age sweep runs;
+// oldSnapshotSweepInterval is how often it runs after that.
+const (
+	oldSnapshotFirstSweep    = 2 * time.Minute
+	oldSnapshotSweepInterval = 6 * time.Hour
+)
+
+// PruneOldSnapshots applies the "auto-delete old backups" setting: the
+// automatic snapshots older than the configured number of days go, the
+// newest on each branch and every manual snapshot stay. A no-op with the
+// setting off. Safe to call from anywhere — the settings handler calls it
+// when the setting is switched on, so the effect is seen at once rather than
+// at the next sweep.
+func (d *Daemon) PruneOldSnapshots() {
+	settings, err := d.Store.GetSettings()
+	if err != nil || !settings.AutoDeleteBackups || settings.AutoDeleteDays <= 0 {
+		return
+	}
+	removed, freed, touched := d.Snapshots.PruneOlderThan(settings.AutoDeleteDays)
+	if removed == 0 {
+		return
+	}
+	d.Log.Log("info", fmt.Sprintf("removed %d automatic snapshot(s) older than %d days, freeing %.1f MB",
+		removed, settings.AutoDeleteDays, float64(freed)/(1024*1024)))
+	if d.OnGameChanged != nil {
+		for _, gameID := range touched {
+			d.OnGameChanged(gameID)
+		}
+	}
+}
+
+// Stop shuts the daemon down cleanly.
+// uploadDrainTimeout caps how long Stop waits for cloud uploads.
+const uploadDrainTimeout = 30 * time.Second
+
+func (d *Daemon) Stop() {
+	// A game still running keeps what it was played for so far.
+	d.endOpenSessions()
+
+	// Order matters. Everything that can START a snapshot is stopped first —
+	// syncs (which follow a peer onto another branch, taking a safety copy on
+	// the way) and the watcher (which snapshots as the game saves) — because
+	// draining before that just leaves room for a new one to begin.
+	d.P2P.Stop()
+	d.Watcher.Stop()
+
+	// Then wait for the snapshots already being written. One that outlives
+	// shutdown writes its archive into a backups directory that may be going
+	// away and records it against a closed database, which shows up as a
+	// snapshot the user never gets and an error nobody sees.
+	if !d.Snapshots.WaitForInFlight(uploadDrainTimeout) {
+		d.Log.Log("warn", "a snapshot was still being written at shutdown; it may be incomplete")
+	}
+	// Including the first snapshot of a newly tracked game, which is taken in
+	// the background so the UI stays responsive: a CLI `add` returns as soon
+	// as the game is recorded, and without this the process exits before the
+	// snapshot is written, leaving a tracked game with no history.
+	if !d.initialSnapshots.Wait(uploadDrainTimeout) {
+		d.Log.Log("warn", "an initial snapshot was still running at shutdown; it may be missing")
+	}
+
+	// Uploads last: a snapshot that finished above may have queued one, and
+	// an upload cut off part-way leaves a truncated archive in the cloud.
+	// Bounded throughout — a wedged provider must not hold a CLI command open
+	// forever, and an upload killed at the timeout is no worse off than it was
+	// before any of this waited at all.
+	if !d.uploads.Wait(uploadDrainTimeout) {
+		d.Log.Log("warn", "a cloud upload was still running at shutdown; it may be incomplete")
+	}
+
+	d.Store.Close()
+	d.Log.Close()
+}
+
+// SteamCoverURL returns Steam's CDN header art for an AppID ("" when the
+// id isn't numeric). No API key needed; the CDN serves these publicly.
+func SteamCoverURL(appID string) string {
+	if appID == "" {
+		return ""
+	}
+	for _, c := range appID {
+		if c < '0' || c > '9' {
+			return ""
+		}
+	}
+	return "https://cdn.cloudflare.steamstatic.com/steam/apps/" + appID + "/header.jpg"
+}
+
+// runCloudUpload mirrors one snapshot to the configured cloud provider and
+// then trims that game's remote copies. Always started with d.uploads already
+// incremented by the caller, and it owns releasing that count.
+func (d *Daemon) runCloudUpload(zipPath, remoteFileName string, log *logging.Logger) {
+	defer d.uploads.Done()
+
+	// Whole, even if it has been compacted since it was queued (a pause can
+	// hold an upload back for as long as it lasts).
+	archive, done, err := snapshot.OpenArchive(zipPath)
+	if err == nil {
+		err = d.Cloud.Upload(archive, remoteFileName)
+		done()
+	}
+	if err != nil {
+		if !cloud.IsNotConfigured(err) {
+			log.Log("error", fmt.Sprintf("cloud upload of %s failed: %v — it will be sent again once the cloud can be reached", remoteFileName, err))
+			d.noteUploadFailed(zipPath, remoteFileName)
+		}
+		return
+	}
+	_ = d.Store.ForgetCloudRetry(remoteFileName)
+	// Now that it is up there, say it is this device's save — if it is. A
+	// copy kept before a restore uploads the same way and is not.
+	if gameID, _, snapID, ok := snapshot.ParseExportEntryName(remoteFileName); ok {
+		d.cloudRd.heads.Lock()
+		rec, _, err := d.Store.GetCloudHead(gameID)
+		d.cloudRd.heads.Unlock()
+		if err == nil && rec.Snapshot == snapID {
+			_ = d.publishHead(gameID)
+		}
+	}
+	// Cloud-side retention mirrors the game's local snapshot limit: keep the
+	// newest maxSnapshots per branch, delete the rest.
+	gameID, branch, _, ok := snapshot.ParseExportEntryName(remoteFileName)
+	if !ok {
+		return
+	}
+	game, err := d.Store.GetGame(gameID)
+	if err != nil || game.MaxSnapshots <= 0 {
+		return
+	}
+	// Only automatic snapshots are candidates. Mirroring the local limit over
+	// every file would delete the user's deliberate snapshots from the cloud
+	// even though local retention now keeps them — leaving the backup thinner
+	// than the machine it is backing up.
+	//
+	// A remote file whose snapshot row is gone locally cannot be classified,
+	// so it stays a candidate: that is the pre-existing behaviour, and
+	// treating unknowns as protected would make cloud storage grow without
+	// bound.
+	prefix := fmt.Sprintf("%s__%s__", gameID, branch)
+	_, _ = d.Cloud.PruneGameBranch(func(name string) bool {
+		if !strings.HasPrefix(name, prefix) {
+			return false
+		}
+		_, _, snapID, parsed := snapshot.ParseExportEntryName(name)
+		if !parsed {
+			return false
+		}
+		if snap, sErr := d.Store.GetSnapshot(snapID); sErr == nil && !snap.IsSystemAuto {
+			return false // a manual snapshot: not the automatic budget's to spend
+		}
+		return true
+	}, game.MaxSnapshots)
+}
+
+// watchResyncInterval is how often the watch set is reconciled against the
+// database.
+//
+// A minute is far below the point where a missing watch costs anything a user
+// would notice, and far above the point where the query matters: it lists
+// games and compares a map.
+const watchResyncInterval = time.Minute
+
+// ResyncWatchers reconciles the live watch set with what the database says,
+// starting watches for games that should have one and stopping those that
+// should not. Returns how many were started and stopped.
+//
+// It exists because the CLI does not talk to a running daemon: every command
+// opens its own short-lived daemon and writes the database directly. A game
+// added with `opensave add` while the desktop app (or a `daemon start`) is
+// running therefore appears in the database but is watched by nobody — no
+// auto-snapshots, no auto-sync — until the long-running process is restarted,
+// and nothing on screen says so. The CLI asks for this afterwards so the
+// running process picks the change up immediately.
+//
+// Existing watches are left strictly alone: Watch replaces a watch outright,
+// so re-watching everything would stop and rebuild every goroutine and every
+// fsnotify registration each time one game changed.
+func (d *Daemon) ResyncWatchers() (started, stopped int) {
+	if d.Watcher == nil {
+		return 0, 0
+	}
+	games, err := d.Store.ListGames()
+	if err != nil {
+		return 0, 0
+	}
+
+	want := make(map[string]string, len(games)) // id -> save path
+	names := make(map[string]string, len(games))
+	for _, game := range games {
+		names[game.ID] = game.Name
+		if game.AutoSync {
+			want[game.ID] = game.SavePath
+		}
+	}
+
+	for _, id := range d.Watcher.WatchedGames() {
+		current, _ := d.Watcher.Watching(id)
+		path, wanted := want[id]
+		switch {
+		case !wanted:
+			// Untracked, or auto-sync switched off.
+			d.Watcher.Unwatch(id)
+			stopped++
+		case path != current:
+			// The save was relocated; the existing watch is on the wrong tree.
+			if err := d.watchGame(id, path); err != nil {
+				d.Log.Log("warn", fmt.Sprintf("could not re-watch %q: %v", id, err))
+				continue
+			}
+			started++
+		case SaveFolderMissing(path):
+			// The folder went while it was watched. The watch is on nothing
+			// now and stays so when the folder comes back, so it is stopped,
+			// and the loop below watches again once it is there.
+			d.Watcher.Unwatch(id)
+			d.noteMissing(id, names[id], path, true)
+			stopped++
+		}
+	}
+
+	for id, path := range want {
+		if _, watching := d.Watcher.Watching(id); watching {
+			continue
+		}
+		if err := d.watchGame(id, path); err != nil {
+			if errors.Is(err, watcher.ErrSaveFolderMissing) {
+				d.noteMissing(id, names[id], path, true)
+				continue
+			}
+			d.Log.Log("warn", fmt.Sprintf("could not watch %q: %v", id, err))
+			continue
+		}
+		d.noteMissing(id, names[id], path, false)
+		started++
+	}
+
+	if started > 0 || stopped > 0 {
+		d.Log.Log("info", fmt.Sprintf(
+			"watch list reconciled after an outside change: %d started, %d stopped",
+			started, stopped))
+	}
+	return started, stopped
+}
+
+// isDuplicateGameID reports the one insert failure that means "this id is
+// taken", as SQLite phrases it.
+func isDuplicateGameID(err error) bool {
+	return err != nil && strings.Contains(err.Error(), "UNIQUE constraint failed: games.id")
+}
+
+// TrackGame adds a new game, takes its initial snapshot (when the save
+// location already has content), and starts watching it.
+func (d *Daemon) TrackGame(game store.Game) (store.Game, error) {
+	abs, err := d.ValidateSavePath(game.SavePath)
+	if err != nil {
+		return store.Game{}, err
+	}
+	game.SavePath = abs
+
+	// Fresh track from the UI (no id supplied): derive the id from the name,
+	// but disambiguate collisions so a second save location for a same-named
+	// game (e.g. two Balatro folders) can be tracked instead of failing on
+	// the games.id UNIQUE constraint. An attempt to track the exact same
+	// folder again is a clear duplicate, not a new location.
+	derivedID := game.ID == ""
+	if derivedID {
+		if existing, err := d.Store.FindGameBySavePath(abs); err == nil {
+			return store.Game{}, fmt.Errorf("this folder is already tracked (as %q)", existing.Name)
+		}
+		base := store.SlugifyGameID(game.Name)
+		// A Switch game is tracked under its title id rather than its name:
+		// that is the same on every device, whichever emulator holds the save
+		// and whatever language it shows names in. See internal/switchtitle.
+		if titleID := switchtitle.FromSavePath(abs); titleID != "" {
+			base = switchtitle.GameID(titleID)
+		}
+		if base == "" {
+			return store.Game{}, fmt.Errorf("game name %q produces an empty id", game.Name)
+		}
+		id := base
+		for n := 2; ; n++ {
+			if _, err := d.Store.GetGame(id); err != nil {
+				break // free
+			}
+			id = fmt.Sprintf("%s-%d", base, n)
+		}
+		game.ID = id
+	}
+
+	// Explicit (re)tracking overrides any earlier untrack: clear the local
+	// tombstone, and tell peers to clear theirs too so a peer that mirrored
+	// an earlier untrack will accept this game again (otherwise its
+	// tombstone would block the sync-on-track below).
+	_ = d.Store.ClearUntrackedTombstone(game.ID)
+	d.P2P.NotifyRetrack(game.ID)
+
+	game.AutoSync = true
+	if game.ActiveBranch == "" {
+		game.ActiveBranch = "main"
+	}
+	if game.MaxSnapshots == 0 {
+		// Inherit the global default retention limit.
+		game.MaxSnapshots = 20
+		if s, err := d.Store.GetSettings(); err == nil && s.DefaultMaxSnapshots > 0 {
+			game.MaxSnapshots = s.DefaultMaxSnapshots
+		}
+	}
+	if game.MaxManualSnapshots == 0 {
+		// Manual snapshots default to being kept forever; a global default is
+		// only applied when the user has set one.
+		if s, err := d.Store.GetSettings(); err == nil && s.DefaultMaxManualSnapshots > 0 {
+			game.MaxManualSnapshots = s.DefaultMaxManualSnapshots
+		}
+	}
+	if game.CoverURL == "" {
+		game.CoverURL = SteamCoverURL(game.AppID)
+	}
+
+	if err := d.Store.CreateGame(game); err != nil {
+		// The id was free a moment ago. If it is taken now, a paired device
+		// that syncs this same game reached us in between and auto-tracked
+		// it — the two sides create the game concurrently when both people
+		// track it within the same second, and the peer's copy lands under
+		// the id this one was about to use. That is not a failure to report
+		// as a database constraint: the game exists, and the only thing the
+		// person needs to know is where it was put, since the peer guessed a
+		// folder and they chose one.
+		if derivedID && isDuplicateGameID(err) {
+			if existing, getErr := d.Store.GetGame(game.ID); getErr == nil {
+				return store.Game{}, fmt.Errorf(
+					"%q already exists: another device synced it here while you were tracking it, and it is kept at %q. "+
+						"If your save lives at %q instead, change the game's save path",
+					existing.Name, existing.SavePath, game.SavePath)
+			}
+		}
+		return store.Game{}, err
+	}
+
+	// Some games keep their saves in the registry — 430 in the manifest, and
+	// for 303 of them it is the only place a save exists. Set up before the
+	// initial snapshot below, so the very first archive holds the registry
+	// half too rather than a files-only copy the user would have to snapshot
+	// again to correct.
+	d.setUpRegistryCapture(game)
+
+	// The initial snapshot can take a while for a big save — run it in the
+	// background so tracking returns immediately and never blocks the UI.
+	// If the game is untracked while the snapshot runs, stop: no watch, no
+	// upload, no zombie work for a game that no longer exists.
+	//
+	// Counted so Stop can wait for it: the CLI's daemon lives only as long as
+	// the command, and without the wait `opensave add` returned before the
+	// snapshot was written and the process took it with it.
+	d.initialSnapshots.Add()
+	go func() {
+		defer d.initialSnapshots.Done()
+		if _, err := d.Snapshots.Create(game.ID, "Initial snapshot", true); err != nil {
+			d.Log.Log("warn", fmt.Sprintf("initial snapshot for %q failed: %v", game.Name, err))
+		}
+		if _, err := d.Store.GetGame(game.ID); err != nil {
+			d.Log.Log("info", fmt.Sprintf("%q was untracked during its initial snapshot; skipping watch", game.Name))
+			return
+		}
+		// A stopped engine is a process on its way out — `opensave add`, whose
+		// own short-lived daemon is gone by the time this runs, and which tells
+		// the running one to take the game on. Nothing failed, and saying
+		// "could not watch" in the shared log sent people looking for a fault.
+		if err := d.watchGame(game.ID, game.SavePath); err != nil && !errors.Is(err, watcher.ErrStopped) {
+			d.Log.Log("warn", fmt.Sprintf("could not watch %q: %v", game.Name, err))
+		}
+		d.Log.Log("success", fmt.Sprintf("now tracking %q at %s", game.Name, logging.Quote(game.SavePath)))
+		if d.OnGameChanged != nil {
+			d.OnGameChanged(game.ID)
+		}
+		// Push the newly tracked game to paired peers so it shows up and
+		// syncs on their side too (they auto-track it from our manifest
+		// request) — without this it only reaches them on the next slow
+		// periodic reconcile. Honors the auto-sync-on-track setting.
+		if settings, err := d.Store.GetSettings(); err != nil || settings.AutoSyncOnTrack {
+			d.P2P.GoSync(func(ctx context.Context) {
+				syncCtx, cancel := context.WithTimeout(ctx, 10*time.Minute)
+				defer cancel()
+				if _, err := d.P2P.SyncGame(syncCtx, game.ID); err != nil {
+					d.Log.Log("info", fmt.Sprintf("initial peer sync for %q: %v", game.Name, err))
+				}
+			})
+		}
+	}()
+
+	created, err := d.Store.GetGame(game.ID)
+	if err != nil {
+		return store.Game{}, err
+	}
+	return created, nil
+}
+
+// validateSavePath rejects save locations that can never be right: paths
+// that don't exist, whole-profile/system directories, drive roots,
+// OpenSave's own data directory, and paths another game already tracks.
+// ValidateSavePath is exported so the CLI applies exactly the same checks the
+// app does when a save location is set or moved.
+func (d *Daemon) ValidateSavePath(rawPath string) (string, error) {
+	if strings.TrimSpace(rawPath) == "" {
+		return "", fmt.Errorf("save path is required")
+	}
+	abs, err := filepath.Abs(rawPath)
+	if err != nil {
+		return "", fmt.Errorf("invalid save path: %w", err)
+	}
+	abs = filepath.Clean(abs)
+	if _, err := os.Stat(abs); err != nil {
+		return "", fmt.Errorf("save path does not exist: %s", abs)
+	}
+	if err := d.checkSavePathShape(abs); err != nil {
+		return "", err
+	}
+
+	// One folder, one game: a second tracker on the same path means double
+	// watchers, duplicate snapshots, and sync confusion.
+	//
+	// Two checks, because neither alone is enough.
+	//
+	// The textual one catches spellings of a path that may not exist any more
+	// — a game whose folder is currently missing still holds its claim.
+	//
+	// os.SameFile catches the aliases no amount of string work can see: a
+	// junction or symlink pointing at an already-tracked folder is a
+	// different string naming the same directory. It is the identity
+	// comparison the filesystem itself uses (volume serial + file index on
+	// Windows, device + inode on Unix). Note filepath.EvalSymlinks is NOT
+	// used here: on Windows it leaves a junction unresolved, returning the
+	// link's own path, so it would have missed exactly the case that prompted
+	// this — `mklink /J`, the usual way a Windows user moves a save folder to
+	// another drive.
+	norm := strings.ToLower(abs)
+	absInfo, absStatErr := os.Stat(abs)
+	games, err := d.Store.ListGames()
+	if err == nil {
+		for _, g := range games {
+			if strings.ToLower(filepath.Clean(g.SavePath)) == norm {
+				return "", fmt.Errorf("%q already tracks this folder", g.Name)
+			}
+			if absStatErr != nil {
+				continue
+			}
+			// Stat failures here are ordinary: a tracked game's folder can be
+			// on a drive that is not plugged in. Such a game simply cannot be
+			// compared by identity, and the textual check above still stands.
+			gInfo, gErr := os.Stat(g.SavePath)
+			if gErr == nil && os.SameFile(absInfo, gInfo) {
+				return "", fmt.Errorf("%q already tracks this folder (%s is the same "+
+					"directory as %s)", g.Name, abs, g.SavePath)
+			}
+		}
+	}
+
+	return abs, nil
+}
+
+// CheckRestoreTarget validates a path files are about to be restored into
+// (backup import onto a possibly-fresh machine): same shape rules as
+// tracking — no drive roots, profile/system folders, or OpenSave's own
+// data dir — but the path is allowed to not exist yet.
+func (d *Daemon) CheckRestoreTarget(rawPath string) (string, error) {
+	if strings.TrimSpace(rawPath) == "" {
+		return "", fmt.Errorf("restore path is required")
+	}
+	abs, err := filepath.Abs(rawPath)
+	if err != nil {
+		return "", fmt.Errorf("invalid restore path: %w", err)
+	}
+	abs = filepath.Clean(abs)
+	if err := d.checkSavePathShape(abs); err != nil {
+		return "", err
+	}
+	return abs, nil
+}
+
+// checkSavePathShape rejects locations that must never hold a single
+// game's save wholesale, regardless of whether they exist yet.
+func (d *Daemon) checkSavePathShape(abs string) error {
+	norm := strings.ToLower(abs)
+	sep := string(filepath.Separator)
+
+	// Drive / filesystem roots.
+	if filepath.Dir(abs) == abs {
+		return fmt.Errorf("refusing to use a drive root (%s) — pick the game's save folder", abs)
+	}
+
+	// Whole-profile and system folders: tracking these would snapshot and
+	// watch far more than a game save (and can grind the machine).
+	home, _ := os.UserHomeDir()
+	broad := []string{home, filepath.Dir(home)}
+	for _, sub := range []string{
+		"Documents", "Desktop", "Downloads", "Pictures", "Videos", "Music", "OneDrive",
+		"AppData", filepath.Join("AppData", "Roaming"), filepath.Join("AppData", "Local"),
+		filepath.Join("AppData", "LocalLow"), filepath.Join("Documents", "My Games"),
+		"Saved Games",
+	} {
+		broad = append(broad, filepath.Join(home, sub))
+	}
+	for _, env := range []string{"WINDIR", "PROGRAMFILES", "PROGRAMFILES(X86)", "PROGRAMDATA", "PUBLIC"} {
+		if v := os.Getenv(env); v != "" {
+			broad = append(broad, v)
+		}
+	}
+	if v := os.Getenv("PUBLIC"); v != "" {
+		broad = append(broad, filepath.Join(v, "Documents"))
+	}
+	// Compared textually AND by filesystem identity. The textual check is the
+	// only one available for a path that does not exist yet (CheckRestoreTarget
+	// allows those), but on its own it is trivially sidestepped: a junction or
+	// symlink is a different string naming the same directory, so
+	// `mklink /J C:\games\saves C:\Users\me` was accepted and the whole profile
+	// became one game's save folder. Measured, not theorised — the direct path
+	// was refused and the junction to it was not.
+	//
+	// What that costs is not just a slow snapshot: a restore empties its target
+	// before unpacking, and this guard is what stands between that and a home
+	// folder.
+	absInfo, absStatErr := os.Stat(abs)
+	for _, b := range broad {
+		if b == "" {
+			continue
+		}
+		if norm == strings.ToLower(filepath.Clean(b)) {
+			return fmt.Errorf(
+				"refusing to use %q — that's a system or profile folder, not a save location; pick the game's own folder inside it", abs)
+		}
+		if absStatErr != nil {
+			continue
+		}
+		bInfo, bErr := os.Stat(b)
+		if bErr == nil && os.SameFile(absInfo, bInfo) {
+			return fmt.Errorf(
+				"refusing to use %q — it points at %q, which is a system or profile "+
+					"folder, not a save location; pick the game's own folder inside it", abs, b)
+		}
+	}
+
+	// Never OpenSave's own data dir (snapshotting the backups folder would
+	// recurse forever).
+	dataDir := strings.ToLower(filepath.Clean(d.Paths.HomeDir))
+	if norm == dataDir || strings.HasPrefix(norm, dataDir+sep) || strings.HasPrefix(dataDir, norm+sep) {
+		return fmt.Errorf("refusing to use OpenSave's own data folder (%s)", abs)
+	}
+	// And by identity, for the same reason as above: a link pointing at the
+	// data folder is a different string for it, and snapshotting the folder
+	// the snapshots live in recurses.
+	if absStatErr == nil {
+		if dataInfo, err := os.Stat(d.Paths.HomeDir); err == nil && os.SameFile(absInfo, dataInfo) {
+			return fmt.Errorf("refusing to use %s — it points at OpenSave's own data folder (%s)",
+				logging.Quote(abs), d.Paths.HomeDir)
+		}
+	}
+	return nil
+}
+
+// EnsureImportedSnapshot registers a snapshot restored from an .sscb
+// backup: creates the branch if missing and inserts the metadata row
+// unless that snapshot id is already known (idempotent re-imports).
+func (d *Daemon) EnsureImportedSnapshot(gameID, branch, snapID, zipPath string, sizeBytes int64) error {
+	if _, err := d.Store.GetSnapshot(snapID); err == nil {
+		return nil // already registered
+	}
+
+	branches, err := d.Store.ListBranches(gameID)
+	if err != nil {
+		return err
+	}
+	haveBranch := false
+	for _, b := range branches {
+		if b == branch {
+			haveBranch = true
+			break
+		}
+	}
+	if !haveBranch {
+		if err := d.Store.CreateBranch(gameID, branch); err != nil {
+			return err
+		}
+	}
+
+	// snap_<ms> ids carry their creation time; reconstruct the timestamp
+	// so imported snapshots sort correctly against existing ones.
+	ts := snapIDToTimestamp(snapID)
+	return d.Store.CreateSnapshot(store.Snapshot{
+		ID:           snapID,
+		GameID:       gameID,
+		BranchName:   branch,
+		Timestamp:    ts,
+		Comment:      "Imported from backup",
+		IsSystemAuto: true,
+		ZipPath:      zipPath,
+		SizeBytes:    sizeBytes,
+	})
+}
+
+func snapIDToTimestamp(snapID string) string {
+	msStr := strings.TrimPrefix(snapID, "snap_")
+	ms, err := strconv.ParseInt(msStr, 10, 64)
+	if err != nil {
+		return time.Now().UTC().Format("2006-01-02T15:04:05.000Z")
+	}
+	return time.UnixMilli(ms).UTC().Format("2006-01-02T15:04:05.000Z")
+}
+
+// UntrackGame stops watching and removes a game. Snapshot zip files on
+// disk are intentionally kept (they're the user's backups); only metadata
+// is removed — same as the JS app.
+func (d *Daemon) UntrackGame(gameID string) error {
+	d.Watcher.Unwatch(gameID)
+	// Read before deleting: the tombstone remembers where this game was, so
+	// a later re-track puts it back there instead of guessing.
+	name, savePath := "", ""
+	if game, err := d.Store.GetGame(gameID); err == nil {
+		name, savePath = game.Name, game.SavePath
+	}
+	if err := d.Store.DeleteGame(gameID); err != nil {
+		return err
+	}
+	// Tombstone stops this device from auto-re-creating the game when a
+	// still-tracking peer asks for its manifest (the "it keeps coming back"
+	// bounce). Propagate the untrack so it registers on paired devices too
+	// (they remove it and tombstone it). Re-tracking on any device clears
+	// the tombstones (NotifyRetrack) and re-shares via sync-on-track.
+	_ = d.Store.AddUntrackedTombstone(gameID, name, savePath)
+	// The deletion records describe a folder this device no longer has an
+	// opinion about. Kept, they would outlive the game and could still
+	// remove a peer's file if it were tracked again later.
+	_ = d.Store.ClearDeletedFilesForGame(gameID)
+	// The same holds for everything this game agreed with any peer: lineage,
+	// merge bases, push records. Game IDs are slugs, so a re-track has the
+	// same ID and would inherit all of it — and a stale lineage reads a file
+	// that went missing while untracked as a deletion to propagate.
+	_ = d.Store.ForgetGameSyncState(gameID)
+	d.P2P.ClearPendingResync(gameID)
+	d.P2P.NotifyUntrack(gameID)
+	return nil
+}
+
+// LinkGames records that aliasID is the same game as canonicalID on this
+// device, so peer syncs addressed to aliasID land on the canonical game
+// (and write into its save path). This is the manual counterpart to App ID
+// matching — for titles tracked under different names on two PCs. If aliasID
+// is itself a tracked game here, that entry is removed so the alias actually
+// takes effect (a direct id lookup would otherwise win); its save data on
+// disk is left untouched, exactly like a normal untrack.
+func (d *Daemon) LinkGames(canonicalID, aliasID string) error {
+	if canonicalID == "" || aliasID == "" || canonicalID == aliasID {
+		return fmt.Errorf("invalid link %q -> %q", aliasID, canonicalID)
+	}
+	if _, err := d.Store.GetGame(canonicalID); err != nil {
+		return fmt.Errorf("canonical game %q: %w", canonicalID, err)
+	}
+	if err := d.Store.AddGameAlias(aliasID, canonicalID); err != nil {
+		return err
+	}
+	// If the alias id is itself a tracked game, snapshot its identity (so
+	// unlink can restore it) and remove that entry so the alias takes effect.
+	if merged, err := d.Store.GetGame(aliasID); err == nil {
+		_ = d.Store.SetAliasSnapshot(aliasID, merged.Name, merged.SavePath, merged.AppID)
+
+		// Carry the merged entry's extra save locations over to the canonical
+		// game. Linking says these are the same game, so its folders are that
+		// game's folders — and deleting the entry below cascades them away,
+		// which would silently stop covering folders the user had set up
+		// without saying anything. The files stay either way; what would be
+		// lost is OpenSave knowing about them.
+		//
+		// A name the canonical game already uses is left alone: it has its own
+		// folder for that name here, and the merged entry's path is no more
+		// authoritative than the one already chosen.
+		if mergedRoots, rootsErr := d.Store.ListGameRoots(aliasID); rootsErr == nil {
+			existing, _ := d.Store.GameRootPaths(canonicalID)
+			for _, root := range mergedRoots {
+				if _, taken := existing[root.Name]; taken {
+					continue
+				}
+				var addErr error
+				if root.Mapped() {
+					addErr = d.Store.AddGameRoot(canonicalID, root.Name, root.Path)
+				} else {
+					addErr = d.Store.NoteGameRoot(canonicalID, root.Name)
+				}
+				if addErr != nil {
+					d.Log.Log("warn", fmt.Sprintf(
+						"linking %q: could not carry over its %q save location: %v", aliasID, root.Name, addErr))
+				}
+			}
+		}
+
+		// Its history comes too, onto branches named after it: deleting the
+		// entry below would otherwise take every snapshot row with it and
+		// leave the archives on disk where nothing lists, restores or prunes
+		// them. So would its place in Favourites and collections.
+		branches, err := d.Store.AdoptHistory(aliasID, canonicalID, snapshot.CleanBranchName(aliasID))
+		if err != nil {
+			return fmt.Errorf("keep %q's snapshots: %w", aliasID, err)
+		}
+		if len(branches) > 0 {
+			d.Log.Log("info", fmt.Sprintf("linked %q into %q: its snapshots are kept on the branch %s",
+				merged.Name, canonicalID, strings.Join(branches, ", ")))
+		}
+		if err := d.Store.AdoptCollections(aliasID, canonicalID); err != nil {
+			d.Log.Log("warn", err.Error())
+		}
+
+		d.Watcher.Unwatch(aliasID)
+		if err := d.Store.DeleteGame(aliasID); err != nil {
+			return err
+		}
+		// The canonical game may have gained locations just now; its watch was
+		// set up before they existed.
+		d.RewatchGame(canonicalID)
+	}
+	return nil
+}
+
+// UnlinkGame removes an alias link and, if that alias was a game merged in via
+// LinkGames, brings it back as its own tracked entry. Its save files on disk
+// were never touched. Its snapshots stay where linking put them — on their own
+// branch of the game it was linked into — and the entry that comes back starts
+// with a fresh initial snapshot.
+//
+// Extra save locations are not handed back either, and that is deliberate
+// rather than missing. Linking copies the merged game's locations onto the
+// canonical one, so they are still covered — just attached to the game that
+// absorbed them. Splitting them again would mean guessing which of the
+// canonical game's locations had originally belonged to which half, and a
+// wrong guess stops a folder being synced without saying so. Re-pointing a
+// folder by hand is a smaller cost than that, and it is visible.
+func (d *Daemon) UnlinkGame(aliasID string) error {
+	alias, ok := d.Store.GetGameAlias(aliasID)
+	if err := d.Store.RemoveGameAlias(aliasID); err != nil {
+		return err
+	}
+	if !ok || alias.SavePath == "" {
+		return nil // nothing to restore
+	}
+	if _, err := d.Store.GetGame(aliasID); err == nil {
+		return nil // already present; don't clobber
+	}
+	restored := store.Game{
+		ID: aliasID, Name: alias.Name, SavePath: alias.SavePath, AppID: alias.AppID,
+		ActiveBranch: "main", AutoSync: true, MaxSnapshots: 20,
+	}
+	if restored.Name == "" {
+		restored.Name = aliasID
+	}
+	if restored.CoverURL == "" {
+		restored.CoverURL = SteamCoverURL(restored.AppID)
+	}
+	if err := d.Store.CreateGame(restored); err != nil {
+		return err
+	}
+	go func() {
+		if _, err := d.Snapshots.Create(aliasID, "Restored after unlink", true); err != nil {
+			d.Log.Log("warn", fmt.Sprintf("restore snapshot for %q failed: %v", aliasID, err))
+		}
+		if err := d.watchGame(aliasID, restored.SavePath); err != nil {
+			d.Log.Log("warn", fmt.Sprintf("could not watch restored %q: %v", aliasID, err))
+		}
+	}()
+	return nil
+}
+
+// untrackFromPeer mirrors a peer's untrack: remove the game + tombstone it,
+// WITHOUT re-notifying (no loop).
+func (d *Daemon) untrackFromPeer(gameID string) {
+	d.Watcher.Unwatch(gameID)
+	// Remember where THIS device kept the game before the record goes. A
+	// re-track on the peer used to bring the game back by auto-tracking from
+	// the peer's manifest request, which invents a local folder by
+	// translating the peer's path — right for a game never seen here, wrong
+	// for one that was: the folder actually being synced, saves and all, was
+	// left behind for a new empty one at a guessed path, and syncing of the
+	// real saves stopped without a word.
+	name, savePath := "", ""
+	if game, err := d.Store.GetGame(gameID); err == nil {
+		name, savePath = game.Name, game.SavePath
+	}
+	if err := d.Store.DeleteGame(gameID); err != nil && err != store.ErrNotFound {
+		d.Log.Log("warn", fmt.Sprintf("untrack from peer: delete %q failed: %v", gameID, err))
+	}
+	_ = d.Store.AddUntrackedTombstone(gameID, name, savePath)
+	// The deletion records describe a folder this device no longer has an
+	// opinion about. Kept, they would outlive the game and could still
+	// remove a peer's file if it were tracked again later.
+	_ = d.Store.ClearDeletedFilesForGame(gameID)
+	// And everything it agreed with any peer, for the reason given in
+	// UntrackGame: the ID comes back, and this must not come back with it.
+	_ = d.Store.ForgetGameSyncState(gameID)
+	d.P2P.ClearPendingResync(gameID)
+	d.Log.Log("info", fmt.Sprintf("game %q untracked on a paired device", gameID))
+}
+
+// retrackFromPeer answers a peer re-tracking a game this device had untracked
+// on its behalf.
+//
+// Where the game's folder is still here, the game is restored to it now,
+// before the peer's sync-on-track arrives — so that request finds a game by
+// ID and syncs, instead of finding nothing and auto-tracking at a path
+// guessed from the peer's. Where the folder is gone, or nothing was
+// remembered, the tombstone is simply cleared and auto-track proceeds as it
+// always did.
+func (d *Daemon) retrackFromPeer(gameID string) {
+	name, savePath := d.Store.RememberedGame(gameID)
+	_ = d.Store.ClearUntrackedTombstone(gameID)
+	if savePath == "" {
+		return
+	}
+	if _, err := d.Store.GetGame(gameID); err == nil {
+		return // already tracked here; nothing to restore
+	}
+	if info, err := os.Stat(savePath); err != nil || (!info.IsDir() && !isFileSave(savePath)) {
+		d.Log.Log("info", fmt.Sprintf("game %q re-tracked on a paired device; its old folder here (%s) is gone, so it will be placed afresh", gameID, savePath))
+		return
+	}
+	if name == "" {
+		name = gameID
+	}
+	if _, err := d.TrackGame(store.Game{ID: gameID, Name: name, SavePath: savePath}); err != nil {
+		d.Log.Log("warn", fmt.Sprintf("could not restore %q at %s after a peer re-tracked it: %v", name, savePath, err))
+		return
+	}
+	d.Log.Log("info", fmt.Sprintf("restored %q at %s after a paired device re-tracked it", name, savePath))
+}
+
+// isFileSave reports whether a remembered path is a single-file save rather
+// than a folder — those are tracked at the file itself.
+func isFileSave(path string) bool {
+	info, err := os.Stat(path)
+	return err == nil && !info.IsDir()
+}
+
+// watchGame starts watching a game's main save folder and every extra save
+// location it has.
+//
+// Every watch goes through here. A game watched on only its main folder looks
+// like it is working — right up until someone edits the folder that was not
+// watched and nothing happens: no snapshot, no sync, no message. Silence is
+// the worst failure this feature can have, because it is indistinguishable
+// from there being nothing to do.
+func (d *Daemon) watchGame(gameID, savePath string) error {
+	extra, err := d.Store.GameRootPaths(gameID)
+	if err != nil {
+		extra = nil // watch what we can rather than nothing
+	}
+	return d.Watcher.WatchWithLocations(gameID, savePath, extra)
+}
+
+// RewatchGame restarts a game's watch, picking up any change to its set of
+// save locations.
+//
+// Adding or removing a location does not change the game's main save path, so
+// the periodic watcher reconcile has nothing to notice — it compares paths.
+// Without this, a location added while the app is running is not watched until
+// the next restart, and a location removed keeps firing events for a folder
+// nobody is covering any more.
+func (d *Daemon) RewatchGame(gameID string) {
+	game, err := d.Store.GetGame(gameID)
+	if err != nil || !game.AutoSync {
+		return
+	}
+	if err := d.watchGame(game.ID, game.SavePath); err != nil {
+		d.Log.Log("warn", fmt.Sprintf("could not re-watch %q after its save locations changed: %v", game.Name, err))
+	}
+}
+
+// WaitForTracking blocks until the background work every TrackGame starts —
+// the first snapshot, then the watch — has finished. For tests that go on to
+// change the game's folders: that work walks them, and on Windows a folder
+// being walked or put under watch cannot be deleted from under it.
+func (d *Daemon) WaitForTracking() { d.initialSnapshots.Wait(0) }

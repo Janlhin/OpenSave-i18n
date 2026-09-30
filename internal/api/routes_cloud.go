@@ -1,0 +1,533 @@
+package api
+
+import (
+	"errors"
+	"fmt"
+	"github.com/opensave/opensave/internal/ignore"
+	"net/http"
+	"os"
+	"path/filepath"
+	"strings"
+	"sync"
+
+	"github.com/go-chi/chi/v5"
+	"github.com/opensave/opensave/internal/cloud"
+	"github.com/opensave/opensave/internal/daemon"
+	"github.com/opensave/opensave/internal/snapshot"
+)
+
+// pendingPKCE holds verifier state between /api/auth/start and
+// /api/auth/callback (one flow at a time, like the JS popup model).
+var pendingPKCE = struct {
+	sync.Mutex
+	provider string
+	verifier string
+}{}
+
+func (s *Server) cloudRoutes(r chi.Router) {
+	r.Post("/api/auth/start", s.handleAuthStart)
+	r.Post("/api/auth/callback", s.handleAuthCallback)
+	r.Post("/api/auth/disconnect", s.handleAuthDisconnect)
+
+	r.Get("/api/cloud/browse", s.handleCloudBrowse)
+	r.Get("/api/cloud/snapshots/{gameId}", s.handleCloudSnapshots)
+	r.Post("/api/cloud/restore/{gameId}", s.handleCloudRestore)
+	r.Post("/api/cloud/delete/{gameId}", s.handleCloudDelete)
+	r.Post("/api/cloud/delete-game/{gameId}", s.handleCloudDeleteGame)
+	r.Post("/api/cloud/sync-local/{gameId}", s.handleCloudSyncLocal)
+
+	r.Get("/api/cloud/offers", s.handleCloudOffers)
+	r.Post("/api/cloud/offers/accept", s.handleCloudOfferAnswer(true))
+	r.Post("/api/cloud/offers/dismiss", s.handleCloudOfferAnswer(false))
+	r.Post("/api/cloud/check", s.handleCloudCheck)
+}
+
+// handleCloudOffers lists the saves from other devices waiting for an answer.
+func (s *Server) handleCloudOffers(w http.ResponseWriter, r *http.Request) {
+	writeJSON(w, http.StatusOK, s.Daemon.CloudOffers())
+}
+
+// handleCloudOfferAnswer takes or declines one offered save.
+func (s *Server) handleCloudOfferAnswer(accept bool) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		var body struct {
+			GameID     string `json:"gameId"`
+			SnapshotID string `json:"snapshotId"`
+		}
+		if err := readJSON(r, &body); err != nil || body.GameID == "" || body.SnapshotID == "" {
+			writeError(w, http.StatusBadRequest, "gameId and snapshotId are required")
+			return
+		}
+		var err error
+		if accept {
+			err = s.Daemon.AcceptCloudOffer(body.GameID, body.SnapshotID)
+		} else {
+			err = s.Daemon.DismissCloudOffer(body.GameID, body.SnapshotID)
+		}
+		if errors.Is(err, daemon.ErrCloudOfferGone) {
+			writeError(w, http.StatusConflict, err.Error())
+			return
+		}
+		if err != nil {
+			writeError(w, http.StatusInternalServerError, err.Error())
+			return
+		}
+		if accept {
+			s.BroadcastGamesUpdate()
+		}
+		writeJSON(w, http.StatusOK, map[string]bool{"success": true})
+	}
+}
+
+// handleCloudCheck reads the cloud for newer saves now rather than at the
+// next scheduled check, and answers with what is left waiting once anything
+// that could be taken without asking has been. It waits for the check: the
+// terminal asks this and has nowhere else to hear the answer.
+func (s *Server) handleCloudCheck(w http.ResponseWriter, r *http.Request) {
+	s.Daemon.CheckCloud()
+	writeJSON(w, http.StatusOK, s.Daemon.CloudOffers())
+}
+
+// handleCloudBrowse lists every cloud snapshot the provider holds, grouped
+// by game, so the UI can present a browsable explorer rather than a flat
+// per-game list. Games with no cloud snapshots are omitted.
+func (s *Server) handleCloudBrowse(w http.ResponseWriter, r *http.Request) {
+	files, err := s.Daemon.Cloud.List()
+	if err != nil {
+		writeError(w, http.StatusBadGateway, err.Error())
+		return
+	}
+
+	type remoteSnap struct {
+		cloud.CloudFile
+		Branch     string `json:"branch"`
+		SnapshotID string `json:"snapshotId"`
+	}
+	type gameGroup struct {
+		GameID    string       `json:"gameId"`
+		GameName  string       `json:"gameName"`
+		Count     int          `json:"count"`
+		TotalSize int64        `json:"totalSize"`
+		Snapshots []remoteSnap `json:"snapshots"`
+	}
+
+	groups := map[string]*gameGroup{}
+	order := []string{}
+	// One entry per game, not per id. Two devices that tracked the same title
+	// under different names upload under different ids, and listing them
+	// separately is what made the provider look like it held two unrelated
+	// games — one of them labelled with a bare slug, because GetGame could not
+	// find it here. Linked ids now fold into the game they were linked to.
+	//
+	// Memoised: a listing has many files and few distinct ids, and resolving
+	// per file would be a query per entry.
+	canonical := map[string]string{}
+	resolve := func(id string) string {
+		if c, done := canonical[id]; done {
+			return c
+		}
+		c := id
+		if ids, err := s.Daemon.Store.LinkedGameIDs(id); err == nil && len(ids) > 0 {
+			c = ids[0] // LinkedGameIDs puts the canonical id first
+		}
+		canonical[id] = c
+		return c
+	}
+	for _, f := range files {
+		rawID, branch, snapID, ok := snapshot.ParseExportEntryName(f.Name)
+		if !ok {
+			continue
+		}
+		gameID := resolve(rawID)
+		g, exists := groups[gameID]
+		if !exists {
+			name := gameID
+			if game, err := s.Daemon.Store.GetGame(gameID); err == nil && game.Name != "" {
+				name = game.Name
+			}
+			g = &gameGroup{GameID: gameID, GameName: name}
+			groups[gameID] = g
+			order = append(order, gameID)
+		}
+		g.Snapshots = append(g.Snapshots, remoteSnap{CloudFile: f, Branch: branch, SnapshotID: snapID})
+		g.Count++
+		g.TotalSize += f.SizeBytes
+	}
+
+	out := make([]*gameGroup, 0, len(order))
+	for _, id := range order {
+		out = append(out, groups[id])
+	}
+	writeJSON(w, http.StatusOK, out)
+}
+
+// handleAuthStart begins a PKCE flow: returns the provider authorize URL
+// for the UI to open (Wails opens it in an auth window in Phase 4; a
+// browser works too).
+func (s *Server) handleAuthStart(w http.ResponseWriter, r *http.Request) {
+	var body struct {
+		Provider string `json:"provider"`
+	}
+	if err := readJSON(r, &body); err != nil || body.Provider == "" {
+		writeError(w, http.StatusBadRequest, "provider is required")
+		return
+	}
+
+	verifier, challenge := cloud.GeneratePKCE()
+	authURL, err := s.Daemon.Cloud.AuthURL(body.Provider, challenge)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+
+	pendingPKCE.Lock()
+	pendingPKCE.provider = body.Provider
+	pendingPKCE.verifier = verifier
+	pendingPKCE.Unlock()
+
+	// Try to catch the redirect automatically (the registered redirect URI
+	// is http://localhost/callback). When this works, sign-in completes
+	// with no copy/paste; otherwise the UI falls back to manual code entry.
+	auto := s.startAuthCallback()
+
+	writeJSON(w, http.StatusOK, map[string]any{"authUrl": authURL, "autoCallback": auto})
+}
+
+// handleAuthCallback finishes the flow with the code captured from the
+// redirect.
+func (s *Server) handleAuthCallback(w http.ResponseWriter, r *http.Request) {
+	var body struct {
+		Code string `json:"code"`
+	}
+	if err := readJSON(r, &body); err != nil || body.Code == "" {
+		writeError(w, http.StatusBadRequest, "code is required")
+		return
+	}
+
+	pendingPKCE.Lock()
+	provider, verifier := pendingPKCE.provider, pendingPKCE.verifier
+	pendingPKCE.provider, pendingPKCE.verifier = "", ""
+	pendingPKCE.Unlock()
+	if provider == "" {
+		writeError(w, http.StatusBadRequest, "no auth flow in progress — call /api/auth/start first")
+		return
+	}
+
+	if err := s.Daemon.Cloud.ExchangeAuthCode(provider, body.Code, verifier); err != nil {
+		writeError(w, http.StatusBadGateway, err.Error())
+		return
+	}
+	cfg, _ := s.Daemon.Store.GetCloudConfig()
+	writeJSON(w, http.StatusOK, map[string]any{"success": true, "userEmail": cfg.UserEmail})
+}
+
+func (s *Server) handleAuthDisconnect(w http.ResponseWriter, r *http.Request) {
+	if err := s.Daemon.Cloud.Disconnect(); err != nil {
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]bool{"success": true})
+}
+
+// handleCloudSnapshots lists remote snapshots belonging to one game
+// (names encode gameId__branch__snapId.zip).
+func (s *Server) handleCloudSnapshots(w http.ResponseWriter, r *http.Request) {
+	gameID := chi.URLParam(r, "gameId")
+	files, err := s.Daemon.Cloud.List()
+	if err != nil {
+		writeError(w, http.StatusBadGateway, err.Error())
+		return
+	}
+
+	type remoteSnap struct {
+		cloud.CloudFile
+		Branch     string `json:"branch"`
+		SnapshotID string `json:"snapshotId"`
+	}
+	accepted, err := s.linkedIDs(gameID)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	matches := []remoteSnap{}
+	for _, f := range files {
+		g, branch, snapID, ok := snapshot.ParseExportEntryName(f.Name)
+		if !ok || !accepted[g] {
+			continue
+		}
+		matches = append(matches, remoteSnap{CloudFile: f, Branch: branch, SnapshotID: snapID})
+	}
+	writeJSON(w, http.StatusOK, matches)
+}
+
+// linkedIDs is the set of game ids whose cloud files belong to this game.
+//
+// A backup's name carries the id of the game that uploaded it, and that id is
+// the slug of the display name — so the same title tracked as "Elden Ring" on
+// one device and "ELDEN RING" on another produces two differently named sets
+// in the provider, and neither device recognised the other's. Linking the two
+// in Manage already taught peer-to-peer sync they are the same game; the cloud
+// screens never asked, so half the feature silently did nothing.
+//
+// Computed once per request rather than per file: the listing can hold
+// hundreds of entries and this would otherwise be a query for each one.
+func (s *Server) linkedIDs(gameID string) (map[string]bool, error) {
+	ids, err := s.Daemon.Store.LinkedGameIDs(gameID)
+	if err != nil {
+		return nil, err
+	}
+	set := make(map[string]bool, len(ids))
+	for _, id := range ids {
+		set[id] = true
+	}
+	return set, nil
+}
+
+// handleCloudRestore downloads a remote snapshot zip, registers it, and
+// restores it over the save.
+func (s *Server) handleCloudRestore(w http.ResponseWriter, r *http.Request) {
+	gameID := chi.URLParam(r, "gameId")
+	var body struct {
+		FileName string `json:"fileName"`
+	}
+	if err := readJSON(r, &body); err != nil || body.FileName == "" {
+		writeError(w, http.StatusBadRequest, "fileName is required")
+		return
+	}
+
+	g, branch, snapID, ok := snapshot.ParseExportEntryName(body.FileName)
+	if !ok {
+		writeError(w, http.StatusBadRequest, "fileName does not belong to this game")
+		return
+	}
+	accepted, err := s.linkedIDs(gameID)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	if !accepted[g] {
+		// Only ids the user has linked to this game are admitted. An
+		// unlinked id is still refused, so this widens what a game accepts
+		// exactly as far as the links recorded and no further.
+		writeError(w, http.StatusBadRequest, "fileName does not belong to this game")
+		return
+	}
+	game, err := s.Daemon.Store.GetGame(gameID)
+	if err != nil {
+		writeError(w, http.StatusNotFound, err.Error())
+		return
+	}
+
+	settings, err := s.Daemon.Store.GetSettings()
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	destDir := filepath.Join(settings.BackupsDir, gameID, branch)
+	if err := os.MkdirAll(destDir, 0o777); err != nil {
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	destPath := filepath.Join(destDir, snapID+".zip")
+
+	if err := s.Daemon.Cloud.Download(body.FileName, destPath); err != nil {
+		writeError(w, http.StatusBadGateway, err.Error())
+		return
+	}
+	info, err := os.Stat(destPath)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	if err := s.Daemon.EnsureImportedSnapshot(gameID, branch, snapID, destPath, info.Size()); err != nil {
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	// A cloud copy may be another device's: this device's excluded files
+	// stay its own (Manager.RestoreKeeping).
+	if _, err := s.Daemon.Snapshots.RestoreKeeping(gameID, snapID, ignore.Parse(game.SyncIgnore)); err != nil {
+		writeError(w, http.StatusInternalServerError, fmt.Sprintf("downloaded but restore failed: %v", err))
+		return
+	}
+	s.Daemon.ForgetCloudOffers(gameID)
+	s.BroadcastGamesUpdate()
+	writeJSON(w, http.StatusOK, map[string]any{"success": true, "snapshotId": snapID})
+}
+
+// handleCloudDelete removes one snapshot from the cloud provider. Local
+// snapshots are untouched — this only frees the remote copy.
+func (s *Server) handleCloudDelete(w http.ResponseWriter, r *http.Request) {
+	gameID := chi.URLParam(r, "gameId")
+	var body struct {
+		FileName string `json:"fileName"`
+		ID       string `json:"id"`
+	}
+	if err := readJSON(r, &body); err != nil || body.FileName == "" {
+		writeError(w, http.StatusBadRequest, "fileName is required")
+		return
+	}
+
+	g, _, snapID, ok := snapshot.ParseExportEntryName(body.FileName)
+	if !ok {
+		writeError(w, http.StatusBadRequest, "fileName does not belong to this game")
+		return
+	}
+	accepted, err := s.linkedIDs(gameID)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	if !accepted[g] {
+		writeError(w, http.StatusBadRequest, "fileName does not belong to this game")
+		return
+	}
+
+	if err := s.Daemon.Cloud.Delete(cloud.CloudFile{ID: body.ID, Name: body.FileName}); err != nil {
+		writeError(w, http.StatusBadGateway, err.Error())
+		return
+	}
+	s.Daemon.Log.Log("info", fmt.Sprintf("cloud: deleted %s (%s)", body.FileName, snapID))
+	writeJSON(w, http.StatusOK, map[string]any{"success": true})
+}
+
+// handleCloudDeleteGame removes every cloud snapshot belonging to one
+// game — used when untracking so orphaned files don't pile up in the
+// provider forever. Local snapshots are untouched.
+func (s *Server) handleCloudDeleteGame(w http.ResponseWriter, r *http.Request) {
+	gameID := chi.URLParam(r, "gameId")
+	files, err := s.Daemon.Cloud.List()
+	if err != nil {
+		writeError(w, http.StatusBadGateway, err.Error())
+		return
+	}
+	// Deliberately NOT widened to linked ids, unlike the read paths above.
+	//
+	// This runs when a game is untracked, and a linked id is another device's
+	// name for the same title — one that is very likely still tracked there.
+	// Removing its backups because this device stopped following the game
+	// would be silent data loss on a machine the user was not even looking at.
+	// Leaving them costs some orphaned files, which is recoverable; the other
+	// way round is not.
+	// This device's announcements of which snapshot is its save go too: they
+	// would otherwise sit in the provider for good, describing a game this
+	// device no longer follows. Other devices' are theirs, and stay.
+	ownKey := ""
+	if settings, err := s.Daemon.Store.GetSettings(); err == nil {
+		ownKey = cloud.DeviceKey(settings.NodeID)
+	}
+	deleted, failed := 0, 0
+	for _, f := range files {
+		if g, dev, _, ok := cloud.ParseHeadFileName(f.Name); ok {
+			if g == gameID && ownKey != "" && dev == ownKey {
+				_ = s.Daemon.Cloud.Delete(f)
+			}
+			continue
+		}
+		g, _, _, ok := snapshot.ParseExportEntryName(f.Name)
+		if !ok || g != gameID {
+			continue
+		}
+		if err := s.Daemon.Cloud.Delete(f); err != nil {
+			failed++
+			s.Daemon.Log.Log("warn", fmt.Sprintf("cloud: delete %s failed: %v", f.Name, err))
+			continue
+		}
+		deleted++
+	}
+	s.Daemon.Log.Log("info", fmt.Sprintf("cloud: removed %d snapshot(s) for untracked game %s", deleted, gameID))
+	writeJSON(w, http.StatusOK, map[string]int{"deleted": deleted, "failed": failed})
+}
+
+// handleCloudSyncLocal uploads every local snapshot of a game that the
+// provider doesn't have yet.
+func (s *Server) handleCloudSyncLocal(w http.ResponseWriter, r *http.Request) {
+	gameID := chi.URLParam(r, "gameId")
+	if _, err := s.Daemon.Store.GetGame(gameID); err != nil {
+		writeError(w, http.StatusNotFound, err.Error())
+		return
+	}
+
+	remote, err := s.Daemon.Cloud.List()
+	if err != nil {
+		writeError(w, http.StatusBadGateway, err.Error())
+		return
+	}
+	// Sizes, not just names. Skipping on the name alone means an archive that
+	// arrived truncated stays truncated forever: it is present, so every later
+	// push passes over it. Uploads interrupted partway do happen — a snapshot
+	// taken by a short-lived CLI process used to die mid-copy — and the file
+	// left behind looks like a backup while containing nothing.
+	remoteSizes := map[string]int64{}
+	for _, f := range remote {
+		remoteSizes[f.Name] = f.SizeBytes
+	}
+
+	branches, err := s.Daemon.Store.ListBranches(gameID)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	// Collect what actually needs uploading first so progress events can
+	// report a meaningful done/total to the UI.
+	type pendingUpload struct {
+		zipPath    string
+		remoteName string
+		snapID     string
+	}
+	var pending []pendingUpload
+	skipped := 0
+	for _, branch := range branches {
+		snaps, err := s.Daemon.Store.ListSnapshots(gameID, branch)
+		if err != nil {
+			continue
+		}
+		for _, snap := range snaps {
+			remoteName := fmt.Sprintf("%s__%s__%s.zip", gameID, branch, snap.ID)
+			if size, present := remoteSizes[remoteName]; present && size == snap.SizeBytes {
+				skipped++
+				continue
+			} else if present {
+				// Present but the wrong size: re-upload over it. A provider
+				// that does not report sizes returns 0, which reads as a
+				// mismatch and costs one redundant upload — the safe way to
+				// be wrong about this.
+				s.Daemon.Log.Log("warn", fmt.Sprintf(
+					"cloud copy of %s is %d bytes, local is %d — re-uploading",
+					remoteName, size, snap.SizeBytes))
+			}
+			pending = append(pending, pendingUpload{zipPath: snap.ZipPath, remoteName: remoteName, snapID: snap.ID})
+		}
+	}
+
+	progress := func(done int, current string, complete bool) {
+		s.Hub.Broadcast("cloud-upload", map[string]any{
+			"gameId": gameID, "done": done, "total": len(pending),
+			"current": current, "complete": complete,
+		})
+	}
+
+	uploaded := 0
+	for _, p := range pending {
+		progress(uploaded, p.snapID, false)
+		archive, done, err := snapshot.OpenArchive(p.zipPath)
+		if err == nil {
+			err = s.Daemon.Cloud.Upload(archive, p.remoteName)
+			done()
+		}
+		if err != nil {
+			if strings.Contains(err.Error(), "not enabled") {
+				progress(uploaded, "", true)
+				writeError(w, http.StatusBadRequest, err.Error())
+				return
+			}
+			s.Daemon.Log.Log("warn", fmt.Sprintf("upload %s failed: %v", p.remoteName, err))
+			skipped++
+			continue
+		}
+		uploaded++
+	}
+	progress(uploaded, "", true)
+	writeJSON(w, http.StatusOK, map[string]int{"uploaded": uploaded, "skipped": skipped})
+}

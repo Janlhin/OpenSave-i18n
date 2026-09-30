@@ -1,0 +1,210 @@
+// REST + WebSocket client for the embedded OpenSave daemon.
+
+import { switchTitleId } from './switchtitle.js';
+
+let baseURL = '';
+
+/** Resolve the daemon address from the Wails-bound Go method. */
+export async function initApi() {
+  // In `wails dev` / browser the binding may be absent — fall back to the
+  // default daemon port.
+  try {
+    const info = await window.go.main.App.DaemonAddr();
+    if (info.error) throw new Error(info.error);
+    baseURL = `http://${info.addr}`;
+  } catch (e) {
+    if (e.message && !String(e.message).includes('undefined')) throw e;
+    baseURL = 'http://127.0.0.1:8383';
+  }
+
+  // Prove the API is reachable from THIS webview before declaring the app
+  // ready. Without this, a blocked/broken local connection renders the
+  // whole UI as endless "Loading…" panels and "Failed to fetch" toasts
+  // with no explanation.
+  let lastErr;
+  for (let attempt = 0; attempt < 4; attempt++) {
+    let status;
+    try {
+      status = await request('GET', '/api/status');
+    } catch (e) {
+      // Not a connection that may come good in a moment, and not a firewall:
+      // said as it is, not wrapped in the advice below, which is about those.
+      if (e.notOpenSave) throw e;
+      lastErr = e;
+      await new Promise((r) => setTimeout(r, 700));
+      continue;
+    }
+    // Answered — but by OpenSave? Its status always carries its settings.
+    // Anything else is another program on the port, and going on would
+    // show that program's answers as an OpenSave with nothing in it.
+    if (!status || typeof status.settings !== 'object' || status.settings === null) {
+      throw notOpenSave();
+    }
+    return baseURL;
+  }
+  throw new Error(
+    `The window can't reach OpenSave's background service at ${baseURL} (${lastErr?.message ?? 'no response'}). ` +
+      `This is usually another program blocking local connections (firewall/antivirus), or a leftover OpenSave still running — ` +
+      `check the system tray and Task Manager, then hit Retry.`
+  );
+}
+
+async function request(method, path, body) {
+  const opts = { method, headers: {} };
+  if (body !== undefined) {
+    opts.headers['Content-Type'] = 'application/json';
+    opts.body = JSON.stringify(body);
+  }
+  const res = await fetch(baseURL + path, opts);
+  const text = await res.text().catch(() => '');
+  let data = {};
+  if (text) {
+    try {
+      data = JSON.parse(text);
+    } catch {
+      // Every OpenSave answer with a body is JSON. One that is not came from
+      // another program on this port, and read as {} it made OpenSave look
+      // empty: no games, first-run settings, "i is not iterable" from a scan.
+      if (res.ok) throw notOpenSave();
+    }
+  }
+  if (!res.ok) {
+    throw new Error(data.error || `${method} ${path} failed (${res.status})`);
+  }
+  return data;
+}
+
+function notOpenSave() {
+  const e = new Error(
+    `Something other than OpenSave is answering at ${baseURL}. Another program is using OpenSave's port — ` +
+      `often a hardware or vendor utility installed alongside a driver or BIOS update. Your games and saves are not affected. ` +
+      `Restart OpenSave to have it pick another port.`
+  );
+  e.notOpenSave = true;
+  return e;
+}
+
+export const api = {
+  get: (path) => request('GET', path),
+  post: (path, body) => request('POST', path, body ?? {}),
+  patch: (path, body) => request('PATCH', path, body),
+  del: (path) => request('DELETE', path)
+};
+
+/**
+ * Cover-art URL served through the local daemon proxy (which caches and has
+ * reliable internet), instead of hotlinking Steam's CDN from the webview.
+ * `portrait` fetches the tall library art.
+ *
+ * A name may be given as well as, or instead of, an App ID. Steam's CDN is
+ * keyed on App ID and can answer for nothing else, so a game sold only on GOG
+ * or itch — or one found under a folder name no manifest recognises — used to
+ * get an empty string here and never ask at all. The daemon can look those up
+ * by name, and returning '' meant nothing ever reached the code that does.
+ *
+ * A Switch game is asked for by its title id too: the daemon makes its cover
+ * from the icon its emulator keeps (lib/switchtitle.js).
+ */
+export function coverURL(appId, portrait = false, name = '', titleId = '') {
+  const q = new URLSearchParams();
+  if (appId) q.set('appId', String(appId));
+  if (name) q.set('name', name);
+  if (titleId) q.set('titleId', titleId);
+  if (![...q.keys()].length) return '';
+  if (portrait) q.set('portrait', '1');
+  return `${baseURL}/api/cover?${q.toString()}`;
+}
+
+/** Best cover for a tracked game: a user's custom URL wins; otherwise the
+ *  proxied art for its App ID, or for its name when it has no App ID.
+ *  `portrait` asks for box art rather than the wide banner. */
+export function gameCover(game, portrait = false) {
+  const custom = game?.coverUrl;
+  if (custom && !custom.includes('steamstatic.com')) return custom;
+  return coverURL(game?.appId, portrait, game?.name ?? '', switchTitleId(game?.savePath));
+}
+
+/** Whether a URL points at this app's own daemon — which is what decides
+ *  whether the page can fetch it (and read its headers) or can only show it
+ *  in an <img>: an image host elsewhere rarely allows a cross-origin fetch. */
+export function isDaemonURL(url) {
+  return !!baseURL && typeof url === 'string' && url.startsWith(baseURL + '/');
+}
+
+/** Open the live-update WebSocket; onMessage receives {type, data}. */
+export function connectWS(onMessage, onState) {
+  let ws = null;
+  let closed = false;
+
+  const connect = () => {
+    ws = new WebSocket(baseURL.replace('http', 'ws') + '/ws');
+    ws.onopen = () => onState?.(true);
+    ws.onmessage = (ev) => {
+      try {
+        onMessage(JSON.parse(ev.data));
+      } catch {}
+    };
+    ws.onclose = () => {
+      onState?.(false);
+      if (!closed) setTimeout(connect, 2000);
+    };
+  };
+  connect();
+
+  return () => {
+    closed = true;
+    ws?.close();
+  };
+}
+
+// ── Native bridges (no-ops outside Wails) ─────────────────────────────
+
+const app = () => window.go?.main?.App;
+
+// Fallback metadata for `wails dev` / browser preview where the Go binding
+// is absent.
+//
+// The version is deliberately not a number. It used to say 2.0.0 and was
+// "kept loosely in sync" with AppInfo(), which meant three releases later a
+// dev build still announced itself as 2.0.0 — a plausible number, so believed.
+// "dev" cannot go stale and cannot be mistaken for a release.
+const FALLBACK_INFO = {
+  name: 'OpenSave',
+  version: 'dev',
+  tagline: 'Peer-to-peer game save sync',
+  license: 'MIT',
+  copyright: '© 2026 Siva Prakash & OpenSave contributors',
+  tech: 'Go + Wails'
+};
+
+export const native = {
+  appInfo: () => app()?.AppInfo?.() ?? Promise.resolve(FALLBACK_INFO),
+  checkUpdate: () => app()?.CheckForUpdate?.() ?? Promise.resolve({ available: false }),
+  changelog: () => app()?.Changelog?.() ?? Promise.resolve(''),
+  changelogReleases: () => app()?.ChangelogReleases?.() ?? Promise.resolve([]),
+  whatsNew: () => app()?.WhatsNew?.() ?? Promise.resolve([]),
+  updateGreeting: () => app()?.UpdateGreeting?.() ?? Promise.resolve({}),
+  installFromPeer: (peerId) => app()?.InstallUpdateFromPeer?.(peerId) ?? Promise.resolve('not available in browser preview'),
+  installFromUrl: (url) => app()?.InstallUpdateFromURL?.(url) ?? Promise.resolve('not available in browser preview'),
+  selectDirectory: (title) => app()?.SelectDirectory(title ?? '') ?? Promise.resolve(''),
+  // Reveals a folder in the system file manager. Resolves to '' on success,
+  // or a message explaining why it couldn't be opened.
+  openFolder: (path) => app()?.OpenFolder(path) ?? Promise.resolve(''),
+  selectFile: (title) => app()?.SelectFile(title ?? '') ?? Promise.resolve(''),
+  selectBackupFile: (title) => app()?.SelectBackupFile(title ?? '') ?? Promise.resolve(''),
+  selectSaveFile: (title, name) => app()?.SelectSaveFile(title ?? '', name ?? '') ?? Promise.resolve(''),
+  openExternal: (url) => app()?.OpenExternal(url),
+  minimise: () => app()?.WindowMinimise(),
+  toggleMaximise: () => app()?.WindowToggleMaximise(),
+  close: () => app()?.WindowClose(),
+  showWindow: () => app()?.ShowWindow(),
+  // A notification on the desktop (cmd/opensave-app/notify.go). Resolves to
+  // '' once shown, or why it could not be.
+  desktopNotify: (note) => app()?.DesktopNotify?.(note) ?? Promise.resolve('not available in browser preview'),
+  // Whether a full-screen game or presentation is running (Windows asks the
+  // OS; elsewhere, and in a browser, never).
+  userBusy: () => app()?.UserBusy?.() ?? Promise.resolve(false),
+  // The native window's colour behind the page (Wails runtime; absent in a browser).
+  setWindowBackground: (r, g, b) => globalThis.runtime?.WindowSetBackgroundColour?.(r, g, b, 255),
+  isWails: () => !!app()
+};

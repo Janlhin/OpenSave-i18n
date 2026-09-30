@@ -1,0 +1,131 @@
+package e2e
+
+import (
+	"net/http"
+	"testing"
+	"time"
+
+	"github.com/opensave/opensave/testutil"
+)
+
+// Setting an App ID by hand exists for the games automatic detection cannot
+// reach: a save under AppData\<company>\<game> has no App ID anywhere in its
+// path, and the bundled manifest does not know every title. Without a way to
+// supply it, App-ID matching is unavailable for exactly the games that need
+// it — which is what a user hit on 2.2.0.
+//
+// So the test is not "does the field save". It is whether a hand-set ID makes
+// two differently-named copies actually sync.
+func TestManualAppID_DrivesCrossDeviceMatching(t *testing.T) {
+	a := testutil.NewTestDaemon(t, "ManualAppID-A")
+	b := testutil.NewTestDaemon(t, "ManualAppID-B")
+	a.PairWith(b)
+
+	// Both devices opt in to App-ID matching; it is off by default.
+	//
+	// And tracking does not sync by itself here. Tracking a game fires a
+	// sync at the peers in the background, which in this test would carry
+	// the game BEFORE the App ID below is set — so the peer, unable to match
+	// it, auto-tracks it as a second game, and every later sync resolves to
+	// that one by id. The save then lands in the auto-tracked folder and the
+	// wait below times out with an empty file, which is exactly how this
+	// test failed on CI: five of the last eight red runs, always here, always
+	// after waiting out the full scaled timeout. The App ID is set by hand
+	// after tracking because that is what a person does; what must not be in
+	// the middle of it is an unrelated sync.
+	for _, d := range []*testutil.TestDaemon{a, b} {
+		d.API(http.MethodPost, "/api/settings",
+			map[string]any{"matchByAppId": true, "autoSyncOnTrack": false}, nil)
+	}
+
+	// The same game, tracked under names that share nothing.
+	a.WriteSave("slot1.sav", "from-A")
+	gameA := a.TrackGame("Mina The Howler")
+
+	var gameB struct {
+		ID string `json:"id"`
+	}
+	b.API(http.MethodPost, "/api/games",
+		map[string]string{"name": "MTH.Repack.Final", "savePath": b.SaveDir}, &gameB)
+	if gameB.ID == "" {
+		t.Fatal("tracking on the peer returned no id")
+	}
+
+	const appID = "9999001"
+	a.API(http.MethodPatch, "/api/games/"+gameA, map[string]string{"appId": appID}, nil)
+	b.API(http.MethodPatch, "/api/games/"+gameB.ID, map[string]string{"appId": appID}, nil)
+
+	// It has to persist and read back, or the UI would show it reverting.
+	var readBack map[string]struct {
+		AppID string `json:"appId"`
+	}
+	a.API(http.MethodGet, "/api/games", nil, &readBack)
+	if got := readBack[gameA].AppID; got != appID {
+		t.Fatalf("app id read back as %q, want %q", got, appID)
+	}
+
+	// Nothing has synced yet, so the peer still holds exactly the one game it
+	// tracked itself. Asserted rather than assumed: if a stray sync ever
+	// slips in again, this says so in a line instead of as a timeout four
+	// minutes later.
+	var beforeSync map[string]struct {
+		Name     string `json:"name"`
+		SavePath string `json:"savePath"`
+	}
+	b.API(http.MethodGet, "/api/games", nil, &beforeSync)
+	if len(beforeSync) != 1 {
+		t.Fatalf("the peer holds %d games before the first sync, want 1 — something "+
+			"synced before the App IDs were set, so the peer auto-tracked a duplicate: %+v",
+			len(beforeSync), beforeSync)
+	}
+
+	// The payoff: two names with nothing in common now sync, because the
+	// shared App ID is what resolves the peer's game to the local one.
+	//
+	// Through syncTo rather than a bare POST. A sync request that arrives
+	// while one is already running for this game answers 200 with
+	// {"queued":true} and no results — success as far as the caller can see,
+	// but the transfer is then owed by a background follow-up. Firing once
+	// and waiting made this test depend on that follow-up, which is not what
+	// it is here to check. syncTo retries until the response actually carries
+	// a result for this peer.
+	syncTo(a, gameA, b.NodeID())
+
+	if !testutil.WaitFor(45*time.Second, func() bool {
+		return b.ReadSave("slot1.sav") == "from-A"
+	}) {
+		t.Errorf("the save never reached the peer: b slot1=%q — a hand-set App ID "+
+			"did not match the two entries", b.ReadSave("slot1.sav"))
+	}
+}
+
+// Matching is opt-in, and a hand-set App ID must not quietly bypass that.
+// Two copies of a game sharing an ID is not consent to merge them.
+func TestManualAppID_RespectsMatchingBeingOff(t *testing.T) {
+	a := testutil.NewTestDaemon(t, "ManualAppIDOff-A")
+	b := testutil.NewTestDaemon(t, "ManualAppIDOff-B")
+	a.PairWith(b)
+
+	a.WriteSave("slot1.sav", "from-A")
+	gameA := a.TrackGame("Some Game")
+
+	var gameB struct {
+		ID string `json:"id"`
+	}
+	b.API(http.MethodPost, "/api/games",
+		map[string]string{"name": "Totally.Different.Name", "savePath": b.SaveDir}, &gameB)
+
+	const appID = "9999002"
+	a.API(http.MethodPatch, "/api/games/"+gameA, map[string]string{"appId": appID}, nil)
+	b.API(http.MethodPatch, "/api/games/"+gameB.ID, map[string]string{"appId": appID}, nil)
+
+	a.API(http.MethodPost, "/api/games/"+gameA+"/sync", nil, nil)
+
+	// Give it long enough that a sync would have happened if it were going to.
+	if testutil.WaitFor(6*time.Second, func() bool {
+		return b.ReadSave("slot1.sav") == "from-A"
+	}) {
+		t.Error("a shared App ID merged two games while App-ID matching was off — " +
+			"the setting is what stops two separate copies being treated as one")
+	}
+}

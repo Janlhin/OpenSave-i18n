@@ -1,0 +1,433 @@
+package store
+
+import (
+	"database/sql"
+	"encoding/json"
+	"errors"
+	"fmt"
+)
+
+// NullString wraps sql.NullString so it serializes on the wire as a plain
+// string (or null), matching the JS daemon — the raw sql.NullString shape
+// ({"String":…,"Valid":…}) reached the dashboard, where `new Date(object)`
+// rendered "last synced Invalid Date".
+type NullString struct {
+	sql.NullString
+}
+
+// MarshalJSON emits the string value, or null when unset.
+func (n NullString) MarshalJSON() ([]byte, error) {
+	if !n.Valid {
+		return []byte("null"), nil
+	}
+	return json.Marshal(n.String)
+}
+
+// UnmarshalJSON accepts a plain string or null.
+func (n *NullString) UnmarshalJSON(b []byte) error {
+	if string(b) == "null" {
+		n.Valid = false
+		n.String = ""
+		return nil
+	}
+	if err := json.Unmarshal(b, &n.String); err != nil {
+		return err
+	}
+	n.Valid = true
+	return nil
+}
+
+// Peer is a paired remote device.
+type Peer struct {
+	ID         string     `db:"id" json:"id"`
+	Name       string     `db:"name" json:"name"`
+	DeviceType string     `db:"device_type" json:"deviceType"`
+	Address    string     `db:"address" json:"address"`
+	Port       int        `db:"port" json:"port"`
+	PairedAt   string     `db:"paired_at" json:"pairedAt"`
+	LastSynced NullString `db:"last_synced" json:"lastSynced"`
+	LastSeenMs int64      `db:"last_seen_ms" json:"-"`
+	Status     string     `db:"status" json:"status"`
+	// PublicKey is the peer's X25519 public half, pinned when pairing
+	// completed. Empty for a peer paired before end-to-end encryption existed,
+	// or by a build that does not have it — which means "cannot encrypt with
+	// this one", not "encryption failed".
+	PublicKey string `db:"public_key" json:"-"`
+	// AuthVerifiedMs is when this peer last proved it holds the private half
+	// of PublicKey, by sending a correctly authenticated request. Zero means
+	// it never has.
+	//
+	// Once non-zero, an unauthenticated request claiming to be this peer is
+	// refused. That latch is what stops an attacker downgrading a pair that
+	// has already upgraded, without breaking a pair where only one side has.
+	// See migrations/0023_peer_request_auth.sql.
+	AuthVerifiedMs int64 `db:"auth_verified_ms" json:"-"`
+}
+
+// UpsertPeer inserts a new paired peer or updates an existing one's
+// connection details (used both at pairing time and whenever a peer's
+// address/status changes, e.g. LAN IP changed or WAN heartbeat received).
+func (s *Store) UpsertPeer(p Peer) error {
+	_, err := s.db.NamedExec(`
+		INSERT INTO peers (id, name, device_type, address, port, status, last_seen_ms)
+		VALUES (:id, :name, :device_type, :address, :port, :status, :last_seen_ms)
+		ON CONFLICT(id) DO UPDATE SET
+			name = excluded.name,
+			device_type = excluded.device_type,
+			address = excluded.address,
+			port = excluded.port,
+			status = excluded.status,
+			last_seen_ms = excluded.last_seen_ms`,
+		p)
+	if err != nil {
+		return fmt.Errorf("upsert peer %s: %w", p.ID, err)
+	}
+	return nil
+}
+
+// UpdatePeer writes a peer's connection details and status, but only while
+// it is still paired: an unpaired peer is left unpaired.
+//
+// For presence — a heartbeat, a ping, a request arriving — which reads a peer,
+// changes its status and writes it back. Written back with UpsertPeer, a
+// peer unpaired in between was inserted again: a device told "you are no
+// longer paired" while its heartbeat was being handled went straight back to
+// paired, with no key, and the unpair was silently undone. UpsertPeer is for
+// the code that pairs.
+func (s *Store) UpdatePeer(p Peer) error {
+	if _, err := s.db.NamedExec(`
+		UPDATE peers SET
+			name = :name,
+			device_type = :device_type,
+			address = :address,
+			port = :port,
+			status = :status,
+			last_seen_ms = :last_seen_ms
+		WHERE id = :id`, p); err != nil {
+		return fmt.Errorf("update peer %s: %w", p.ID, err)
+	}
+	return nil
+}
+
+// GetPeer returns a single paired peer by ID.
+func (s *Store) GetPeer(id string) (Peer, error) {
+	var p Peer
+	err := s.db.Get(&p, `SELECT * FROM peers WHERE id = ?`, id)
+	if errors.Is(err, sql.ErrNoRows) {
+		return Peer{}, ErrNotFound
+	}
+	if err != nil {
+		return Peer{}, fmt.Errorf("get peer %s: %w", id, err)
+	}
+	return p, nil
+}
+
+// ListPeers returns every paired peer.
+func (s *Store) ListPeers() ([]Peer, error) {
+	var peers []Peer
+	if err := s.db.Select(&peers, `SELECT * FROM peers ORDER BY name`); err != nil {
+		return nil, fmt.Errorf("list peers: %w", err)
+	}
+	return peers, nil
+}
+
+// MarkPeerAuthVerified records that this peer has authenticated a request.
+//
+// Only ever moves forward, and only ever from a request whose MAC already
+// verified — so it cannot be set by anyone who does not hold the key.
+func (s *Store) MarkPeerAuthVerified(id string, whenMs int64) error {
+	_, err := s.db.Exec(
+		`UPDATE peers SET auth_verified_ms = ? WHERE id = ? AND auth_verified_ms < ?`,
+		whenMs, id, whenMs)
+	if err != nil {
+		return fmt.Errorf("mark peer %s authenticated: %w", id, err)
+	}
+	return nil
+}
+
+// SetPeerPairedAt overrides a peer's paired_at timestamp (used by the
+// legacy importer to carry over the original pairing date instead of the
+// insert-time default).
+func (s *Store) SetPeerPairedAt(id, timestampISO8601 string) error {
+	res, err := s.db.Exec(`UPDATE peers SET paired_at = ? WHERE id = ?`, timestampISO8601, id)
+	if err != nil {
+		return fmt.Errorf("set peer paired_at %s: %w", id, err)
+	}
+	return checkRowAffected(res)
+}
+
+// UpdatePeerLastSynced stamps a peer's last_synced time (called after a
+// successful sync run completes with that peer).
+func (s *Store) UpdatePeerLastSynced(id, timestampISO8601 string) error {
+	res, err := s.db.Exec(`UPDATE peers SET last_synced = ? WHERE id = ?`, timestampISO8601, id)
+	if err != nil {
+		return fmt.Errorf("update peer last_synced %s: %w", id, err)
+	}
+	return checkRowAffected(res)
+}
+
+// PrunePeersAtAddress removes paired peers registered at the same
+// address:port under a DIFFERENT id, returning the names removed. Called
+// when a pairing is confirmed: a fresh install on the same machine gets a
+// new node ID, and without this the old identity lingers as a permanently
+// offline ghost in the device list. Never applies to "relay" (all WAN
+// peers share that pseudo-address).
+func (s *Store) PrunePeersAtAddress(address string, port int, keepID string) ([]string, error) {
+	if address == "" || address == "relay" {
+		return nil, nil
+	}
+	var names []string
+	if err := s.db.Select(&names,
+		`SELECT name FROM peers WHERE address = ? AND port = ? AND id != ?`,
+		address, port, keepID); err != nil {
+		return nil, fmt.Errorf("find stale peers at %s:%d: %w", address, port, err)
+	}
+	if len(names) == 0 {
+		return nil, nil
+	}
+	if _, err := s.db.Exec(
+		`DELETE FROM game_peer_sync_state WHERE peer_id IN
+		   (SELECT id FROM peers WHERE address = ? AND port = ? AND id != ?)`,
+		address, port, keepID); err != nil {
+		return nil, fmt.Errorf("prune stale peer sync state: %w", err)
+	}
+	if _, err := s.db.Exec(
+		`DELETE FROM game_root_sync_state WHERE peer_id IN
+		   (SELECT id FROM peers WHERE address = ? AND port = ? AND id != ?)`,
+		address, port, keepID); err != nil {
+		return nil, fmt.Errorf("prune stale peer root sync state: %w", err)
+	}
+	if _, err := s.db.Exec(
+		`DELETE FROM peers WHERE address = ? AND port = ? AND id != ?`,
+		address, port, keepID); err != nil {
+		return nil, fmt.Errorf("prune stale peers at %s:%d: %w", address, port, err)
+	}
+	return names, nil
+}
+
+// UnpairPeer removes a paired peer and its per-game sync lineage state.
+func (s *Store) UnpairPeer(id string) error {
+	tx, err := s.db.Beginx()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+
+	if _, err := tx.Exec(`DELETE FROM game_peer_sync_state WHERE peer_id = ?`, id); err != nil {
+		return fmt.Errorf("delete sync state for peer %s: %w", id, err)
+	}
+	if _, err := tx.Exec(`DELETE FROM game_root_sync_state WHERE peer_id = ?`, id); err != nil {
+		return fmt.Errorf("delete root sync state for peer %s: %w", id, err)
+	}
+	// Offers this device never answered. An offer is a request to place a
+	// game so it can sync with the device that asked; once that device is
+	// unpaired there is nothing to sync it with, and leaving the row would
+	// invite the user to create a game with no peer behind it.
+	//
+	// Done here rather than at the four call sites that unpair, so it cannot
+	// be forgotten by whichever one is added next.
+	if _, err := tx.Exec(`DELETE FROM offered_games WHERE peer_id = ?`, id); err != nil {
+		return fmt.Errorf("delete offered games for peer %s: %w", id, err)
+	}
+	res, err := tx.Exec(`DELETE FROM peers WHERE id = ?`, id)
+	if err != nil {
+		return fmt.Errorf("delete peer %s: %w", id, err)
+	}
+	if err := checkRowAffected(res); err != nil {
+		return err
+	}
+	return tx.Commit()
+}
+
+// GamePeerSyncState is the lineage bookkeeping used by the P2P sync engine
+// to compute conflict/direction without relying on wall-clock comparisons:
+// the set of relative file/dir paths that were part of the last
+// successful sync with a given peer for a given game.
+type GamePeerSyncState struct {
+	GameID          string `db:"game_id"`
+	PeerID          string `db:"peer_id"`
+	LastSyncedFiles string `db:"last_synced_files"`
+	LastSyncedDirs  string `db:"last_synced_dirs"`
+	// AgreedHash is the manifest hash both sides held at the last true
+	// convergence — the merge-base for content-based conflict detection.
+	// Empty means no convergence recorded yet.
+	AgreedHash string `db:"agreed_hash"`
+	// PushedHash is the state this device last handed to the peer. Seeing the
+	// peer hold it proves the push landed even if the peer's report was lost.
+	PushedHash string `db:"pushed_hash"`
+	// LastSynced is when this game was last confirmed the same on both sides,
+	// ISO 8601 like peers.last_synced. Empty until the first completed sync.
+	// For display; the conflict guard does not read it.
+	LastSynced string `db:"last_synced"`
+}
+
+// gameIsTracked guards every write that CREATES a row describing what a game
+// agreed with a peer.
+//
+// Untracking a game clears all of it, and then a write already in flight puts
+// some of it back: these are upserts, the table has no foreign key to games,
+// and the writers — a sync finishing its own work, and a peer's report of
+// what it just pulled, which arrives over the network and cannot be ordered
+// against a local untrack — do not ask whether the game is still tracked.
+//
+// Game ids are slugs, so tracking the same folder again produces the same id
+// and the game comes back holding a record of what it agreed with a peer in a
+// previous life. A file removed from the folder while it was untracked then
+// reads as a deletion to propagate, and the peer — which did nothing — loses
+// it. Observed as a CI failure on Windows under the race detector, and
+// reproducible on demand by making the late write by hand.
+//
+// Guarded here, at the single statement every such write goes through, rather
+// than at the call sites, so the next writer added cannot miss it. Updates to
+// a row that already exists are untouched: the game was tracked when it was
+// written, and UntrackGame removes the row itself.
+const gameIsTracked = `EXISTS (SELECT 1 FROM games WHERE id = ?)`
+
+// GetAgreedHash returns the last-convergence manifest hash for a
+// game+peer ("" if never converged).
+func (s *Store) GetAgreedHash(gameID, peerID string) string {
+	var hash string
+	if err := s.db.Get(&hash,
+		`SELECT agreed_hash FROM game_peer_sync_state WHERE game_id = ? AND peer_id = ?`,
+		gameID, peerID); err != nil {
+		return ""
+	}
+	return hash
+}
+
+// SetAgreedHash records the manifest hash both sides verifiably held.
+//
+// It also clears any outstanding pushed hash, because recording a convergence
+// settles the question that record exists to answer. Left behind, it outlives
+// the push it describes: a later pull moves the base on, and if the peer ever
+// returns to the older pushed state — rolling back to one of its own snapshots
+// does exactly that — the stale record would match again and drag the base
+// backwards onto it, silently discarding the newer agreement and pushing over
+// the peer's copy instead of raising a conflict.
+func (s *Store) SetAgreedHash(gameID, peerID, hash string) error {
+	_, err := s.db.Exec(`
+		INSERT INTO game_peer_sync_state (game_id, peer_id, last_synced_files, last_synced_dirs, agreed_hash)
+		SELECT ?, ?, '[]', '[]', ? WHERE `+gameIsTracked+`
+		ON CONFLICT(game_id, peer_id) DO UPDATE SET
+			agreed_hash = excluded.agreed_hash,
+			pushed_hash = ''`,
+		gameID, peerID, hash, gameID)
+	if err != nil {
+		return fmt.Errorf("set agreed hash %s/%s: %w", gameID, peerID, err)
+	}
+	return nil
+}
+
+// GetPushedHash returns the manifest state this device last handed to a peer
+// ("" if it has never pushed to it). Observing the peer holding exactly this
+// hash later is proof the push landed, which lets a merge-base stranded by a
+// lost report be repaired from data alone.
+func (s *Store) GetPushedHash(gameID, peerID string) string {
+	var hash string
+	if err := s.db.Get(&hash,
+		`SELECT pushed_hash FROM game_peer_sync_state WHERE game_id = ? AND peer_id = ?`,
+		gameID, peerID); err != nil {
+		return ""
+	}
+	return hash
+}
+
+// SetPushedHash records the state this device just handed to a peer.
+func (s *Store) SetPushedHash(gameID, peerID, hash string) error {
+	_, err := s.db.Exec(`
+		INSERT INTO game_peer_sync_state (game_id, peer_id, last_synced_files, last_synced_dirs, pushed_hash)
+		SELECT ?, ?, '[]', '[]', ? WHERE `+gameIsTracked+`
+		ON CONFLICT(game_id, peer_id) DO UPDATE SET pushed_hash = excluded.pushed_hash`,
+		gameID, peerID, hash, gameID)
+	if err != nil {
+		return fmt.Errorf("set pushed hash %s/%s: %w", gameID, peerID, err)
+	}
+	return nil
+}
+
+// GetSyncState returns the last-synced file/dir path sets for a game+peer,
+// or empty sets if this is the first sync ever attempted with that peer.
+func (s *Store) GetSyncState(gameID, peerID string) (files, dirs []string, err error) {
+	var row GamePeerSyncState
+	dbErr := s.db.Get(&row, `SELECT * FROM game_peer_sync_state WHERE game_id = ? AND peer_id = ?`, gameID, peerID)
+	if errors.Is(dbErr, sql.ErrNoRows) {
+		return []string{}, []string{}, nil
+	}
+	if dbErr != nil {
+		return nil, nil, fmt.Errorf("get sync state %s/%s: %w", gameID, peerID, dbErr)
+	}
+	if err := json.Unmarshal([]byte(row.LastSyncedFiles), &files); err != nil {
+		return nil, nil, fmt.Errorf("unmarshal last_synced_files: %w", err)
+	}
+	if err := json.Unmarshal([]byte(row.LastSyncedDirs), &dirs); err != nil {
+		return nil, nil, fmt.Errorf("unmarshal last_synced_dirs: %w", err)
+	}
+	return files, dirs, nil
+}
+
+// SetSyncState replaces the lineage bookkeeping for a game+peer wholesale
+// after a successful sync — matches the JS app's Set-replace-in-full
+// approach rather than incremental row-level tracking.
+func (s *Store) SetSyncState(gameID, peerID string, files, dirs []string) error {
+	if files == nil {
+		files = []string{}
+	}
+	if dirs == nil {
+		dirs = []string{}
+	}
+	filesJSON, err := json.Marshal(files)
+	if err != nil {
+		return err
+	}
+	dirsJSON, err := json.Marshal(dirs)
+	if err != nil {
+		return err
+	}
+	_, err = s.db.Exec(`
+		INSERT INTO game_peer_sync_state (game_id, peer_id, last_synced_files, last_synced_dirs)
+		SELECT ?, ?, ?, ? WHERE `+gameIsTracked+`
+		ON CONFLICT(game_id, peer_id) DO UPDATE SET
+			last_synced_files = excluded.last_synced_files,
+			last_synced_dirs = excluded.last_synced_dirs`,
+		gameID, peerID, string(filesJSON), string(dirsJSON), gameID)
+	if err != nil {
+		return fmt.Errorf("set sync state %s/%s: %w", gameID, peerID, err)
+	}
+	return nil
+}
+
+// UpdateGamePeerLastSynced stamps the moment a game was confirmed the same on
+// this device and one peer. The row is created if the sync finished before
+// any lineage was written for it, so the stamp is never silently dropped.
+func (s *Store) UpdateGamePeerLastSynced(gameID, peerID, timestampISO8601 string) error {
+	_, err := s.db.Exec(`
+		INSERT INTO game_peer_sync_state (game_id, peer_id, last_synced_files, last_synced_dirs, last_synced)
+		SELECT ?, ?, '[]', '[]', ? WHERE `+gameIsTracked+`
+		ON CONFLICT(game_id, peer_id) DO UPDATE SET last_synced = excluded.last_synced`,
+		gameID, peerID, timestampISO8601, gameID)
+	if err != nil {
+		return fmt.Errorf("update game last_synced %s/%s: %w", gameID, peerID, err)
+	}
+	return nil
+}
+
+// GameLastSynced returns, for one game, when it was last confirmed in sync
+// with each peer: peer id to ISO 8601 timestamp. Peers it has never finished
+// a sync with are absent, as are peers no longer paired — a device that was
+// unpaired takes its rows with it.
+func (s *Store) GameLastSynced(gameID string) (map[string]string, error) {
+	var rows []struct {
+		PeerID     string `db:"peer_id"`
+		LastSynced string `db:"last_synced"`
+	}
+	if err := s.db.Select(&rows, `
+		SELECT peer_id, last_synced FROM game_peer_sync_state
+		WHERE game_id = ? AND last_synced != ''`, gameID); err != nil {
+		return nil, fmt.Errorf("game last_synced %s: %w", gameID, err)
+	}
+	out := make(map[string]string, len(rows))
+	for _, r := range rows {
+		out[r.PeerID] = r.LastSynced
+	}
+	return out, nil
+}

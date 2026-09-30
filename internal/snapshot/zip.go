@@ -1,0 +1,357 @@
+package snapshot
+
+import (
+	"archive/zip"
+	"bytes"
+	"compress/flate"
+	"crypto/sha256"
+	"encoding/hex"
+	"fmt"
+	"io"
+	"os"
+	"path/filepath"
+	"strings"
+	"sync"
+
+	"github.com/opensave/opensave/internal/delta"
+	"github.com/opensave/opensave/internal/store"
+
+	"github.com/opensave/opensave/internal/fsx"
+)
+
+// ZipPath archives sourcePath into a ZIP at outPath. A directory is
+// archived as its contents (entries relative to the directory root, not
+// wrapped in a top-level folder — matching adm-zip's addLocalFolder); a
+// single file is archived as one root-level entry (addLocalFile).
+// Each file is compressed if it compresses and stored as-is if it does not;
+// see addFileEntry.
+//
+// Unreadable files (locked by a running game or AV, special/junction
+// entries) are skipped and reported rather than failing the whole
+// snapshot — but if nothing at all could be archived, that's an error.
+func ZipPath(sourcePath, outPath string) (skipped []string, err error) {
+	skipped, _, err = ZipPathCapturing(sourcePath, outPath)
+	return skipped, err
+}
+
+// ZipPathCapturing is ZipPath, also reporting the hash of every file it
+// archived so the caller can record what the snapshot holds. The hashes come
+// free: the bytes pass through a hasher on their way into the archive.
+func ZipPathCapturing(sourcePath, outPath string) (skipped []string, captured []store.CapturedFile, err error) {
+	info, err := os.Stat(sourcePath)
+	if err != nil {
+		return nil, nil, fmt.Errorf("source path does not exist: %w", err)
+	}
+
+	out, err := os.Create(outPath)
+	if err != nil {
+		return nil, nil, err
+	}
+	defer out.Close()
+
+	w := newSnapshotWriter(out)
+	defer w.Close()
+
+	if !info.IsDir() {
+		name := filepath.Base(sourcePath)
+		hash, addErr := addFileEntry(w, sourcePath, name)
+		if addErr != nil {
+			return nil, nil, addErr
+		}
+		return nil, []store.CapturedFile{{Path: name, Hash: hash}}, nil
+	}
+
+	archived := 0
+	walkErr := filepath.Walk(sourcePath, func(path string, walkInfo os.FileInfo, walkErr error) error {
+		if walkErr != nil {
+			// Unreadable subtree — record it and move on.
+			if path != sourcePath {
+				skipped = append(skipped, path)
+				return nil
+			}
+			return walkErr
+		}
+		if path == sourcePath {
+			return nil
+		}
+		rel, err := filepath.Rel(sourcePath, path)
+		if err != nil {
+			return err
+		}
+		rel = filepath.ToSlash(rel)
+
+		if walkInfo.IsDir() {
+			// Explicit directory entries keep empty dirs restorable.
+			if _, err := w.CreateHeader(&zip.FileHeader{Name: rel + "/", Method: zip.Store}); err != nil {
+				return err
+			}
+			return nil
+		}
+		hash, addErr := addFileEntry(w, path, rel)
+		if addErr != nil {
+			skipped = append(skipped, path)
+			return nil
+		}
+		captured = append(captured, store.CapturedFile{Path: rel, Hash: hash})
+		archived++
+		return nil
+	})
+	if walkErr != nil {
+		return skipped, captured, walkErr
+	}
+	if archived == 0 && len(skipped) > 0 {
+		return skipped, captured, fmt.Errorf("no files could be read (%d unreadable)", len(skipped))
+	}
+	return skipped, captured, nil
+}
+
+// The returned hash is the sha256 of the file's contents, hex encoded —
+// deliberately the same value delta.FileEntry.Hash carries, so a recorded
+// snapshot file can be compared against a manifest without either side
+// re-reading anything.
+//
+// It costs nothing to produce here. The bytes are already streaming through
+// this function on their way into the archive, so hashing them is a second
+// writer on the same copy rather than a second pass over the disk.
+func addFileEntry(w *zip.Writer, filePath, entryName string) (string, error) {
+	f, err := fsx.OpenShared(filePath)
+	if err != nil {
+		return "", err
+	}
+	defer f.Close()
+
+	info, err := f.Stat()
+	if err != nil {
+		return "", err
+	}
+	// Read the start of the file first, to decide how to store it; the bytes
+	// read are written from memory and the rest streamed after them, so the
+	// file is still read once.
+	buf := probeBuffers.Get().(*[]byte)
+	defer probeBuffers.Put(buf)
+	n, err := io.ReadFull(f, *buf)
+	if err != nil && err != io.EOF && err != io.ErrUnexpectedEOF {
+		return "", err
+	}
+	head := (*buf)[:n]
+
+	method := zip.Store
+	if compresses(head) {
+		method = zip.Deflate
+	}
+	header := &zip.FileHeader{Name: entryName, Method: method}
+	header.Modified = info.ModTime()
+
+	entry, err := w.CreateHeader(header)
+	if err != nil {
+		return "", err
+	}
+	sum := sha256.New()
+	if _, err := io.Copy(io.MultiWriter(entry, sum), io.MultiReader(bytes.NewReader(head), f)); err != nil {
+		return "", err
+	}
+	return hex.EncodeToString(sum.Sum(nil)), nil
+}
+
+// Snapshots used to store every file uncompressed, on the grounds that saves
+// are usually compressed already or small. Many are neither — JSON, XML, a
+// game engine's own uncompressed binary — and every snapshot is a whole copy,
+// so a save that deflates to a fifth of its size was costing five times the
+// disk, locally and in the cloud mirror, for every version kept.
+//
+// So each file is tried: the first compressProbeBytes are deflated at the
+// fastest level, and the file is compressed only if that sample shrank by at
+// least compressMinSaving. A save that is already compressed fails the test
+// and is stored exactly as before, costing a 64 KiB trial and nothing more.
+// Every reader goes through archive/zip, which reads either method, so older
+// versions restore these archives unchanged.
+const (
+	compressProbeBytes = 64 << 10
+	// compressMinSaving is the fraction the sample must shrink by.
+	compressMinSaving = 0.10
+	// compressMinBytes: below this there is too little to judge, and too
+	// little to save.
+	compressMinBytes = 512
+)
+
+// compresses reports whether a file whose first bytes are sample is worth
+// deflating.
+func compresses(sample []byte) bool {
+	if len(sample) < compressMinBytes {
+		return false
+	}
+	var out countingWriter
+	fw := flateWriters.Get().(*flate.Writer)
+	defer flateWriters.Put(fw)
+	fw.Reset(&out)
+	if _, err := fw.Write(sample); err != nil {
+		return false
+	}
+	if err := fw.Close(); err != nil {
+		return false
+	}
+	return float64(out.n) <= float64(len(sample))*(1-compressMinSaving)
+}
+
+// Compressors and probe buffers are reused. Setting up a deflate compressor
+// allocates its tables — far more than a small save file holds — and each
+// file needs two, one to test and one to write. Made fresh per file, a save
+// folder of five thousand small files took six times as long to snapshot.
+var (
+	flateWriters = sync.Pool{New: func() any {
+		w, _ := flate.NewWriter(io.Discard, flate.BestSpeed)
+		return w
+	}}
+	probeBuffers = sync.Pool{New: func() any {
+		b := make([]byte, compressProbeBytes)
+		return &b
+	}}
+)
+
+// pooledFlate hands its compressor back when the archive entry is closed.
+type pooledFlate struct{ w *flate.Writer }
+
+func (p *pooledFlate) Write(b []byte) (int, error) { return p.w.Write(b) }
+
+func (p *pooledFlate) Close() error {
+	err := p.w.Close()
+	flateWriters.Put(p.w)
+	p.w = nil
+	return err
+}
+
+type countingWriter struct{ n int }
+
+func (c *countingWriter) Write(p []byte) (int, error) {
+	c.n += len(p)
+	return len(p), nil
+}
+
+// newSnapshotWriter is a zip writer whose deflate is the fastest level. A
+// snapshot is taken every time a game saves, often while it is still
+// running; the default level buys a little more space for several times the
+// CPU, which is the wrong trade on a handheld mid-game.
+func newSnapshotWriter(out io.Writer) *zip.Writer {
+	w := zip.NewWriter(out)
+	w.RegisterCompressor(zip.Deflate, func(dst io.Writer) (io.WriteCloser, error) {
+		fw := flateWriters.Get().(*flate.Writer)
+		fw.Reset(dst)
+		return &pooledFlate{w: fw}, nil
+	})
+	return w
+}
+
+// UnzipTo extracts a snapshot ZIP over targetPath. Single-file save mode
+// (target is an existing file, or the archive holds exactly one root-level
+// file and the target doesn't exist) extracts into the target's parent
+// directory after removing the old file; directory mode clears the target
+// directory and extracts into it — both matching unzipDirectory() in the
+// JS app.
+func UnzipTo(zipPath, targetPath string) error {
+	// Defence in depth, not the load-bearing guard. Extraction does not
+	// restore the archived modification time — the written file gets the
+	// current one — so the hash cache would notice on its own today. It is
+	// here because the archive DOES record each entry's mtime (see
+	// header.Modified above), restoring it is the obvious future improvement,
+	// and on the day someone makes that change this line is what stops it
+	// silently serving pre-restore hashes. A restore is rare; the re-read
+	// costs nothing worth measuring.
+	defer delta.InvalidateRoot(targetPath)
+
+	r, err := zip.OpenReader(zipPath)
+	if err != nil {
+		return fmt.Errorf("open zip archive: %w", err)
+	}
+	defer r.Close()
+
+	// Whether the save is one file or a folder. A tracked location can be
+	// either — several RPG Maker titles keep a single file — and the answer
+	// decides where everything in the archive lands.
+	//
+	// What is on disk settles it when the target exists. When it does not, the
+	// archive cannot: a snapshot of a lone save.dat and a snapshot of a folder
+	// containing only save.dat hold exactly the same entry, so counting entries
+	// answers the question by guessing at it. It guessed wrong in the case that
+	// matters most — a game uninstalled, its folder gone, one file in its last
+	// snapshot — and wrote the save into the PARENT of the save folder, where
+	// the game will never look, while reporting the restore a success.
+	//
+	// The path's own shape is the better answer and the one the rest of this
+	// package already uses: ensureSavePathExists treats a save path with an
+	// extension as a file and anything else as a folder.
+	isFile := false
+	if info, statErr := os.Stat(targetPath); statErr == nil {
+		isFile = !info.IsDir()
+	} else {
+		isFile = len(filepath.Ext(targetPath)) > 1
+	}
+
+	var destDir string
+	if isFile {
+		destDir = filepath.Dir(targetPath)
+		if err := os.MkdirAll(destDir, 0o777); err != nil {
+			return err
+		}
+		if _, statErr := os.Stat(targetPath); statErr == nil {
+			_ = os.Chmod(targetPath, 0o666)
+			if err := os.Remove(targetPath); err != nil {
+				return fmt.Errorf("remove old save file: %w", err)
+			}
+		}
+	} else {
+		destDir = targetPath
+		if err := os.MkdirAll(destDir, 0o777); err != nil {
+			return err
+		}
+		if err := clearSavePathGuarded(destDir); err != nil {
+			return fmt.Errorf("clear target dir: %w", err)
+		}
+	}
+
+	for _, entry := range r.File {
+		if err := extractEntry(entry, destDir); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func extractEntry(entry *zip.File, destDir string) error {
+	return extractEntryAs(entry, destDir, entry.Name)
+}
+
+// extractEntryAs writes one entry under destDir at relName, which may differ
+// from the entry's own name — a save location's files are stored inside the
+// archive under a prefix and restored without it. The zip-slip check runs on
+// the name actually being written, since that is the one that decides where
+// bytes land.
+func extractEntryAs(entry *zip.File, destDir, relName string) error {
+	// Reject entries that would escape the destination (zip-slip).
+	cleanName := filepath.Clean(filepath.FromSlash(relName))
+	if strings.HasPrefix(cleanName, "..") || filepath.IsAbs(cleanName) {
+		return fmt.Errorf("zip entry %q escapes destination", entry.Name)
+	}
+	destPath := filepath.Join(destDir, cleanName)
+
+	if entry.FileInfo().IsDir() {
+		return os.MkdirAll(destPath, 0o777)
+	}
+	if err := os.MkdirAll(filepath.Dir(destPath), 0o777); err != nil {
+		return err
+	}
+
+	src, err := entry.Open()
+	if err != nil {
+		return err
+	}
+	defer src.Close()
+
+	dst, err := os.OpenFile(destPath, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0o666)
+	if err != nil {
+		return err
+	}
+	defer dst.Close()
+
+	_, err = io.Copy(dst, src)
+	return err
+}

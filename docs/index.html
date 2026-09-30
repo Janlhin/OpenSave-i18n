@@ -1,0 +1,673 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>OpenSave — Steam Cloud for every game you own</title>
+  <meta name="description" content="OpenSave is a free, open-source, peer-to-peer game save sync. Auto-detect saves for 20,000+ games, snapshot every change, and sync between your PC, Mac, laptop, and Steam Deck — no accounts, no subscriptions, no telemetry.">
+  <meta property="og:title" content="OpenSave — Steam Cloud for every game you own">
+  <meta property="og:description" content="Free, open-source, peer-to-peer game save sync. Snapshots, conflict handling, LAN + internet sync, optional cloud backup. No accounts. No telemetry.">
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="https://www.opensave.org/">
+  <link rel="canonical" href="https://www.opensave.org/">
+  <meta property="og:image" content="https://opensave.org/screenshots/home-library.png">
+  <meta name="theme-color" content="#0c0c0d">
+  <meta name="twitter:card" content="summary_large_image">
+  <link rel="icon" type="image/png" sizes="48x48" href="favicon-48x48.png">
+  <link rel="icon" type="image/png" sizes="192x192" href="favicon-192x192.png">
+  <link rel="apple-touch-icon" href="favicon-192x192.png">
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+
+  <link rel="stylesheet" href="styles.css?v=7">
+</head>
+<body>
+  <!-- ===== STATUS BANNER: relay moved to its own domain. REMOVE once 2.3.0 has shipped. ===== -->
+  <style>
+    body.os-banner-on{padding-bottom:84px}
+    #os-status{position:fixed;left:0;right:0;bottom:0;z-index:9999;background:#2a1f07;border-top:1px solid #7a5c12;color:#f2e4c4;font:500 14px/1.5 Inter,system-ui,sans-serif;padding:11px 46px 11px 18px;display:flex;flex-wrap:wrap;gap:4px 12px;align-items:center;justify-content:center;text-align:center;box-shadow:0 -8px 28px rgba(0,0,0,.5)}
+    #os-status code{background:#0f0c04;border:1px solid #7a5c12;border-radius:5px;padding:2px 7px;font:500 13px/1.4 'JetBrains Mono',ui-monospace,monospace;color:#ffcf5c;word-break:break-all}
+    #os-status a{color:#ffcf5c;text-decoration:underline;white-space:nowrap}
+    #os-status button{position:absolute;top:50%;right:6px;transform:translateY(-50%);background:none;border:0;color:#c9b071;font:600 22px/1 system-ui,sans-serif;cursor:pointer;padding:4px 10px;border-radius:6px}
+    #os-status button:hover{color:#ffcf5c;background:#3a2c0c}
+    @media(max-width:700px){
+      body.os-banner-on{padding-bottom:104px}
+      #os-status{font-size:12.5px;line-height:1.45;padding:9px 36px 9px 12px;gap:2px 8px}
+      #os-status code{font-size:12px}
+      #os-status .os-verbose{display:none}
+      #os-status button{top:2px;right:0;transform:none;font-size:20px}
+    }
+  </style>
+  <div id="os-status" role="status" aria-live="polite">
+    <strong style="color:#ffcf5c">Internet sync is working again.</strong>
+    <span class="os-verbose">It runs on our own server now.</span>
+    <span>If it still fails, set the relay on <em>both</em> devices to</span>
+    <code>wss://relay.opensave.org</code>
+    <a href="https://github.com/Liquid-co/OpenSave/issues/10">How &amp; why &rarr;</a>
+    <button type="button" aria-label="Dismiss this notice">&times;</button>
+  </div>
+  <script>(function(){var b=document.getElementById("os-status"),K="os-relay-domain-notice";try{if(localStorage.getItem(K)){b.remove();return}}catch(e){}document.body.classList.add("os-banner-on");function fit(){document.body.style.paddingBottom=(b.offsetHeight+16)+"px";}addEventListener("resize",fit);addEventListener("load",fit);if(document.fonts&&document.fonts.ready)document.fonts.ready.then(fit);b.querySelector("button").addEventListener("click",function(){b.remove();document.body.classList.remove("os-banner-on");document.body.style.paddingBottom="";try{localStorage.setItem(K,"1")}catch(e){}});fit();})();</script>
+
+
+  <!-- ambient background -->
+  <div class="ambient-layer" aria-hidden="true">
+    <div class="ambient-glow glow-1"></div>
+    <div class="ambient-glow glow-2"></div>
+  </div>
+
+  <!-- ===================== NAV ===================== -->
+  <header class="navbar">
+    <div class="nav-container">
+      <a class="logo" href="#top" aria-label="OpenSave home">
+        <img src="icon.png?v=2" alt="" class="logo-img">
+        <span class="logo-text">Open<span>Save</span></span>
+      </a>
+      <nav class="nav-links" id="nav-links">
+        <a href="#features">Features</a>
+        <a href="#how">How it works</a>
+        <a href="#docs">Docs</a>
+        <a href="#faq">FAQ</a>
+        <a href="https://discord.gg/hvBv92DZvn" target="_blank" rel="noopener" class="discord-link">
+          <svg viewBox="0 0 24 18" width="16" height="12" aria-hidden="true"><path fill="currentColor" d="M20.32 1.53A19.8 19.8 0 0 0 15.43 0c-.21.38-.46.9-.63 1.31a18.3 18.3 0 0 0-5.6 0C9.03.9 8.77.38 8.56 0A19.74 19.74 0 0 0 3.67 1.53C.57 6.19-.27 10.73.15 15.21A19.9 19.9 0 0 0 6.18 18c.49-.66.92-1.37 1.29-2.11-.71-.27-1.39-.6-2.03-.98.17-.13.34-.26.5-.4a14.2 14.2 0 0 0 12.12 0c.16.14.33.27.5.4-.64.38-1.32.71-2.03.98.37.74.8 1.45 1.29 2.11a19.87 19.87 0 0 0 6.03-2.79c.5-5.19-.84-9.69-3.53-13.68ZM8.02 12.46c-1.18 0-2.15-1.08-2.15-2.4s.95-2.4 2.15-2.4c1.2 0 2.17 1.09 2.15 2.4 0 1.32-.95 2.4-2.15 2.4Zm7.96 0c-1.18 0-2.15-1.08-2.15-2.4s.95-2.4 2.15-2.4c1.2 0 2.17 1.09 2.15 2.4 0 1.32-.95 2.4-2.15 2.4Z"/></svg>
+          Discord
+        </a>
+        <a href="https://opensave.gumroad.com/l/usygu" target="_blank" rel="noopener" class="donate-link">
+          <svg viewBox="0 0 24 24" width="15" height="15" aria-hidden="true"><path fill="currentColor" d="M12 21s-7.5-4.6-10.2-9.6C.4 8.5 1.7 5 5.1 4.2c2-.5 4 .3 5.1 2 .9-1.7 3-2.5 5-2 3.4.8 4.7 4.3 3.3 7.2C19.5 16.4 12 21 12 21z"/></svg>
+          Donate
+        </a>
+        <a href="https://github.com/Liquid-co/OpenSave" target="_blank" rel="noopener" class="github-link">
+          <svg class="github-icon" viewBox="0 0 16 16" width="16" height="16" aria-hidden="true"><path fill="currentColor" d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"></path></svg>
+          GitHub
+        </a>
+        <a href="#download" class="nav-cta">Download</a>
+      </nav>
+      <button class="nav-toggle" id="nav-toggle" aria-label="Toggle navigation">
+        <span></span><span></span><span></span>
+      </button>
+    </div>
+  </header>
+
+  <!-- ===================== HERO ===================== -->
+  <section class="hero" id="top">
+    <div class="hero-copy">
+      <!-- Kept as .hero-eyebrow because app.js rewrites the version here
+           from the live GitHub tag, matching a text node against /v2.\d/. -->
+      <div class="hero-eyebrow">
+        <span class="badge-dot"></span> v2.4.0 &mdash; latest release
+      </div>
+
+      <h1 class="hero-title">Steam Cloud for<br><span>every&nbsp;game</span> you own.</h1>
+
+      <p class="hero-subtitle">
+        Your saves, synced between your own devices, peer&#8209;to&#8209;peer.
+        Emulators, GOG, Epic, repacks, mods — everything Steam Cloud leaves out.
+      </p>
+
+      <p class="hero-claim">No accounts. No subscriptions. No telemetry.</p>
+
+      <div class="hero-ctas center">
+        <a href="#download" class="btn-primary">
+          <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path fill="currentColor" d="M12 16l-5-5h3V4h4v7h3l-5 5zm-7 4h14v-2H5v2z"/></svg>
+          Download OpenSave
+        </a>
+        <a href="#how" class="btn-secondary">How it works</a>
+      </div>
+
+      <p class="hero-meta">
+        Free &amp; open source &middot; MIT licensed &middot; one native binary &middot;
+        <a href="https://github.com/Liquid-co/OpenSave/releases" target="_blank" rel="noopener">all releases &rarr;</a>
+      </p>
+    </div>
+
+    <!-- Wider than the 1060px reading measure the rest of the page uses.
+         The copy above it is centred and narrow; letting the window break
+         past that column is what gives the section its scale, and it puts
+         the app on screen at a size where the cover art is legible. -->
+    <figure class="hero-shot">
+      <div class="app-window">
+        <div class="win-bar">
+          <div class="win-dots"><span></span><span></span><span></span></div>
+          <span class="win-title">OpenSave</span>
+        </div>
+        <img src="screenshots/home-library.png" alt="The OpenSave app: a library of games shown as cover-art tiles, each with its sync status and snapshot count." loading="eager" width="1920" height="1050">
+      </div>
+    </figure>
+  </section>
+
+  <!-- ===================== THE PROBLEM =====================
+       Promoted above the feature detail. It is the setup everything
+       else answers, and it used to sit third, behind a screenshot
+       gallery — so the page showed off before it said what for. -->
+  <section class="section section-tinted" id="why">
+    <div class="section-container">
+      <div class="section-heading">
+        <span class="section-eyebrow">The problem</span>
+        <h2>Your saves are trapped on one machine.</h2>
+        <p class="section-sub">
+          Steam Cloud only covers games bought on Steam — and only when the developer opts in.
+          Everything else is a folder you have to remember to copy.
+        </p>
+      </div>
+      <div class="why-grid">
+        <div class="why-card bad">
+          <h3><span class="why-mark">✕</span> Without OpenSave</h3>
+          <ul>
+            <li>Manually copying <code>AppData</code> folders over USB or chat apps</li>
+            <li>"Which device has the newest save?" roulette</li>
+            <li>Emulator &amp; GOG progress stuck on one PC</li>
+            <li>One corrupted write and the playthrough is gone</li>
+            <li>Cloud services that want an account, a fee, and your data</li>
+          </ul>
+        </div>
+        <div class="why-card good">
+          <h3><span class="why-mark">✓</span> With OpenSave</h3>
+          <ul>
+            <li>Saves sync automatically the moment a game writes them</li>
+            <li>Every device always has the latest — LAN or across the internet</li>
+            <li>Emulators, GOG, Epic, repacks, mods: all auto-detected</li>
+            <li>Every change snapshotted &amp; reversible, forever</li>
+            <li>Peer-to-peer between <em>your</em> devices. Your data never leaves your control</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===================== WHAT IT DOES =====================
+       Three clusters, not nine flat cards. A nine-card grid gave every
+       capability the same weight and the same single line, which is
+       what made it read as filler; grouping them into find / sync /
+       protect lets each one carry the detail that actually sells it.
+
+       The screenshots are here rather than in a gallery of their own.
+       A standalone "see it in action" section shows the app at a
+       distance; sitting beside the claim it proves, the same image is
+       evidence. -->
+  <section class="section" id="features">
+    <div class="section-container">
+      <div class="section-heading">
+        <span class="section-eyebrow">What it does</span>
+        <h2>Find every save. Sync it everywhere. Never lose one.</h2>
+        <p class="section-sub">
+          Four jobs, in the order you meet them. Click any screenshot to zoom.
+        </p>
+      </div>
+
+      <div class="cluster reveal">
+        <figure class="cluster-shot" data-zoom>
+          <img src="screenshots/auto-scan.png" alt="Scan results: cover art for 14 save locations found and ready to track, filterable by Games, Emulators and Repacks." loading="lazy">
+        </figure>
+        <div class="cluster-body">
+          <span class="cluster-key">find</span>
+          <h3>It already knows where your saves live.</h3>
+          <p>
+            One scan finds your games wherever they keep their saves — Steam, emulators,
+            GOG, Epic, repacks — each with real cover art, one click to track.
+          </p>
+          <ul class="cluster-list">
+            <li><strong>20,000+ games indexed.</strong> A community-maintained save-location database ships inside the app, so scanning is instant and works fully offline.</li>
+            <li><strong>Anything can be a game.</strong> Point it at any folder or single file. Watched live with safe-write-aware detection, so it never grabs a half-flushed save mid-write.</li>
+            <li><strong>Proton and Wine prefixes too</strong> — which is most of a Steam Deck library, found without configuration.</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="cluster flip reveal">
+        <figure class="cluster-shot" data-zoom>
+          <img src="screenshots/devices-pairing.png" alt="The Devices screen with a Steam Deck paired, online and connected directly." loading="lazy">
+        </figure>
+        <div class="cluster-body">
+          <span class="cluster-key">sync</span>
+          <h3>Pair once. Progress follows you.</h3>
+          <p>
+            Same Wi-Fi? Devices find each other on their own. Across the internet? Share a
+            <strong>room code</strong> — no port forwarding, no static IP, no account.
+          </p>
+          <ul class="cluster-list">
+            <li><strong>Only the changed blocks travel.</strong> Saves are chunked and SHA-256 hashed, and large files stream from disk — a 4&nbsp;GB save moves with almost no memory.</li>
+            <li><strong>Every pairing is approved on both ends.</strong> Nothing connects to your machine because it guessed a name.</li>
+            <li><strong>Deck, desktop, laptop, NAS.</strong> An official Flatpak runs on stock SteamOS, and a CLI covers headless boxes.</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="cluster reveal">
+        <figure class="cluster-shot" data-zoom>
+          <img src="screenshots/cloud-backup.png" alt="The Cloud Backup screen with provider tiles for Google Drive, OneDrive, Dropbox, WebDAV and more, with Google Drive connected." loading="lazy">
+        </figure>
+        <div class="cluster-body">
+          <span class="cluster-key">protect</span>
+          <h3>A bad save is a rollback, not a loss.</h3>
+          <p>
+            Every change becomes a versioned snapshot. Roll back a whole save or a single
+            file, and keep parallel playthroughs on separate branches.
+          </p>
+          <ul class="cluster-list">
+            <li><strong>Conflicts ask you.</strong> Diverged saves are found by a shared merge base — the exact state both devices last agreed on, like git — not by clocks that lie. Keep yours, theirs, or both.</li>
+            <li><strong>Optional cloud backup.</strong> Mirror snapshots to Google Drive, Dropbox, OneDrive, WebDAV or a NAS folder, with resumable uploads. Off by default — peer-to-peer needs no cloud at all.</li>
+            <li><strong>Updates itself.</strong> One click from GitHub releases, or pull a newer build straight from a paired device.</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="cluster flip reveal">
+        <figure class="cluster-shot" data-zoom>
+          <img src="screenshots/activity.png" alt="The Activity timeline: for each game, where it was last played, its last snapshot and sync, and the time played on this PC." loading="lazy">
+        </figure>
+        <div class="cluster-body">
+          <span class="cluster-key">see</span>
+          <h3>Know where every save stands.</h3>
+          <p>
+            Activity shows, game by game, where it was last played, when it was last saved and
+            synced, and how long you have played it here.
+          </p>
+          <ul class="cluster-list">
+            <li><strong>One timeline.</strong> Every sync, snapshot and play session, filtered by kind or by game.</li>
+            <li><strong>Play sessions.</strong> OpenSave notices a tracked game running, and snapshots and syncs its save when it closes.</li>
+            <li><strong>Nothing waits unseen.</strong> A bell keeps what happened and what needs you, and desktop notifications say so when OpenSave is not in front.</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===================== COMPARISON =====================
+       The "isn't this just Ludusavi?" question gets asked in every
+       thread this project appears in. Answering it on the home page,
+       honestly and without hedging, does more than another feature
+       card would. Full table lives on compare.html. -->
+  <section class="section section-tinted" id="compare">
+    <div class="section-container">
+      <div class="section-heading">
+        <span class="section-eyebrow">Honestly</span>
+        <h2>How it compares.</h2>
+        <p class="section-sub">
+          Ludusavi is an excellent backup tool — OpenSave's auto-scan is built on its
+          community manifest, and it deserves the credit. The difference is live sync.
+        </p>
+      </div>
+      <div class="table-scroll">
+        <table class="compare-table">
+          <thead>
+            <tr>
+              <th>Capability</th>
+              <th class="col-us">OpenSave</th>
+              <th>Steam Cloud</th>
+              <th>Ludusavi</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>Any store, emulator, or repack</td>
+              <td class="col-us">Yes</td>
+              <td class="no">Steam only, opt-in</td>
+              <td>Yes</td>
+            </tr>
+            <tr>
+              <td>Syncs the moment a save changes</td>
+              <td class="col-us">Yes</td>
+              <td>Steam titles only</td>
+              <td class="no">Manual backup/restore</td>
+            </tr>
+            <tr>
+              <td>Direct LAN sync, no internet</td>
+              <td class="col-us">Yes</td>
+              <td class="no">No</td>
+              <td class="no">No</td>
+            </tr>
+            <tr>
+              <td>Snapshot history &amp; rollback</td>
+              <td class="col-us">Yes</td>
+              <td class="no">Latest state only</td>
+              <td>Timestamped backups</td>
+            </tr>
+            <tr>
+              <td>Resolves save conflicts</td>
+              <td class="col-us">Compares content, asks you</td>
+              <td>Picks by timestamp</td>
+              <td class="no">Not applicable</td>
+            </tr>
+            <tr>
+              <td>Open source</td>
+              <td class="col-us">MIT</td>
+              <td class="no">No</td>
+              <td>Yes</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <p class="table-note">
+        This describes what each project is built for, not every edge case.
+        <a href="compare.html">See the full comparison</a>, including GameSave Manager —
+        corrections welcome via a
+        <a href="https://github.com/Liquid-co/OpenSave/issues" target="_blank" rel="noopener">GitHub issue</a>.
+      </p>
+    </div>
+  </section>
+
+  <!-- ===================== HOW IT WORKS ===================== -->
+  <section class="section" id="how">
+    <div class="section-container">
+      <div class="section-heading">
+        <span class="section-eyebrow">Under the hood</span>
+        <h2>Watch → Delta → Snapshot → Sync.</h2>
+        <p class="section-sub">A local-first pipeline that treats your saves like source code: hashed, versioned, and merged with intent.</p>
+      </div>
+      <div class="arch-panel">
+        <div class="arch-diagram">
+          <svg viewBox="0 0 680 396" role="img" aria-label="Two devices — your desktop and your Steam Deck — sync directly over the LAN, or across the internet through a stateless relay that stores nothing." xmlns="http://www.w3.org/2000/svg">
+            <defs>
+              <marker id="ah" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+                <path d="M0,0 L10,5 L0,10 z" fill="var(--accent)"/>
+              </marker>
+            </defs>
+
+            <!-- device: desktop -->
+            <text class="d-title" x="160" y="34" text-anchor="middle">Your Desktop</text>
+            <rect class="d-box" x="52" y="46" width="216" height="118" rx="14"/>
+            <text class="d-row" data-stage="a0" x="160" y="84" text-anchor="middle">watcher</text>
+            <text class="d-row" data-stage="a1" x="160" y="112" text-anchor="middle">snapshots</text>
+            <text class="d-row" data-stage="a2" x="160" y="140" text-anchor="middle">delta</text>
+
+            <!-- device: steam deck -->
+            <text class="d-title" x="520" y="34" text-anchor="middle">Your Steam Deck</text>
+            <rect class="d-box" x="412" y="46" width="216" height="118" rx="14"/>
+            <text class="d-row" data-stage="b0" x="520" y="84" text-anchor="middle">watcher</text>
+            <text class="d-row" data-stage="b1" x="520" y="112" text-anchor="middle">snapshots</text>
+            <text class="d-row" data-stage="b2" x="520" y="140" text-anchor="middle">delta</text>
+
+            <!-- LAN direct link -->
+            <line class="wire" id="w-lan" x1="276" y1="105" x2="404" y2="105" marker-start="url(#ah)" marker-end="url(#ah)"/>
+            <text class="wire-label" x="340" y="94" text-anchor="middle">LAN · direct</text>
+
+            <!-- WAN links to relay -->
+            <path class="wire" id="w-wan-out" d="M160,164 V232 Q160,248 176,248 H300" fill="none" marker-end="url(#ah)"/>
+            <path class="wire" id="w-wan-in" d="M520,164 V232 Q520,248 504,248 H380" fill="none" marker-end="url(#ah)"/>
+            <rect class="wan-chip" x="286" y="188" width="108" height="26" rx="13"/>
+            <text class="wire-label" x="340" y="205" text-anchor="middle">WAN · room code</text>
+
+            <!-- relay -->
+            <rect class="r-box" x="248" y="292" width="184" height="70" rx="14"/>
+            <text class="r-title" x="340" y="324" text-anchor="middle">relay</text>
+            <text class="r-sub" x="340" y="346" text-anchor="middle">routes only · stores nothing</text>
+          </svg>
+        </div>
+        <div class="arch-notes">
+          <h3>Local-first by design</h3>
+          <p>The relay is a stateless room broker — it forwards WebSocket frames and <strong>writes no save to disk</strong>. From 2.4.0, saves are sealed end to end between your two devices, so the relay forwards what it cannot read. Ours is <code>wss://relay.opensave.org</code>. Don't want to take our word for it? <a href="https://github.com/Liquid-co/OpenSave#self-hosting-the-relay" target="_blank" rel="noopener">Self-host it</a> with one binary or a Dockerfile.</p>
+          <p>Prefer a terminal? The headless daemon + <code>opensave-cli</code> runs on servers and Steam Deck alike, and everything the app does is scriptable over a local REST/WebSocket API.</p>
+
+          <!-- Filled from https://relay.opensave.org/health at load. Left as
+               "checking" in the markup rather than showing an optimistic
+               "online" that a failed fetch would leave standing. -->
+          <div class="relay-live" id="relay-live" data-state="checking">
+            <span class="relay-dot"></span>
+            <span class="relay-label">Checking relay&hellip;</span>
+            <!-- Deliberately not "devices connected" or "rooms open".
+                 Those measure how busy the relay is this second, which on a
+                 young project reads as nobody using it — and they can show
+                 zero at a quiet moment. These three only ever improve, and
+                 they answer the question the outages actually raised: is
+                 this thing dependable. -->
+            <dl class="relay-stats" hidden>
+              <div><dt>uptime</dt><dd data-k="uptime">&mdash;</dd></div>
+              <div><dt>relayed</dt><dd data-k="messages">&mdash;</dd></div>
+              <div><dt>dropped</dt><dd data-k="dropped">&mdash;</dd></div>
+            </dl>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===================== OPEN SOURCE ===================== -->
+  <section class="section section-tinted" id="opensource">
+    <div class="section-container">
+      <div class="oss-panel">
+        <div class="oss-text">
+          <span class="section-eyebrow">Open source</span>
+          <h2>Your saves. Your devices. Your code.</h2>
+          <p>
+            OpenSave is MIT-licensed and developed in the open — a single small native binary in
+            <strong>Go</strong> with an embedded UI. No Electron, no runtime to install, no account
+            to create.
+          </p>
+          <ul class="oss-list">
+            <li>Read every line before you trust it with your saves</li>
+            <li>SQLite storage in <code>~/.opensave/</code> — your data in an open format</li>
+            <li>Self-host the relay, script the CLI, build from source</li>
+            <li>Issues and pull requests welcome</li>
+          </ul>
+          <div class="hero-ctas">
+            <a href="https://github.com/Liquid-co/OpenSave" class="btn-secondary" target="_blank" rel="noopener">
+              <svg class="github-icon" viewBox="0 0 16 16" width="18" height="18" aria-hidden="true"><path fill="currentColor" d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"></path></svg>
+              Star on GitHub
+            </a>
+            <a href="https://github.com/Liquid-co/OpenSave/blob/main/USER_GUIDE.md" class="btn-ghost" target="_blank" rel="noopener">Read the User Guide →</a>
+          </div>
+        </div>
+        <div class="oss-terminal" aria-hidden="true">
+          <div class="win-bar">
+            <div class="win-dots"><span></span><span></span><span></span></div>
+            <div class="win-title">opensave-cli</div>
+          </div>
+          <pre class="terminal-body"><span class="t-prompt">$</span> opensave-cli scan
+<span class="t-ok">✓</span> found 158 game saves (Steam · repacks · emulators)
+<span class="t-prompt">$</span> opensave-cli add ~/games/skyrim/Saves
+<span class="t-ok">✓</span> tracking "Skyrim" — watching for changes
+<span class="t-prompt">$</span> opensave-cli status
+  Elden Ring        <span class="t-ok">synced</span>   2 peers · 41 snapshots
+  Hollow Knight     <span class="t-sync">syncing</span>  214 KB → Steam Deck
+  Skyrim            <span class="t-ok">synced</span>   just now
+<span class="t-prompt">$</span> opensave-cli rollback "Elden Ring" snap_40
+<span class="t-ok">✓</span> restored — previous state kept as a branch</pre>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===================== DOCS =====================
+       The guide and the CLI reference were reachable only from the nav
+       bar, which meant they existed for anyone who thought to look up
+       and nobody who was reading down the page. They now get the same
+       treatment as every other destination: a section that says what is
+       in them before asking anyone to leave for them. -->
+  <section class="section" id="docs">
+    <div class="section-container">
+      <div class="section-heading">
+        <span class="section-eyebrow">Documentation</span>
+        <h2>Written for people who have never done this before.</h2>
+        <p class="section-sub">
+          Two guides. One assumes nothing at all; the other assumes you would
+          rather not open a window.
+        </p>
+      </div>
+
+      <div class="docs-grid">
+        <a class="docs-card" href="getting-started.html">
+          <span class="docs-key">guide</span>
+          <h3>Getting started</h3>
+          <p>
+            From a fresh install to saves syncing between two machines, explaining
+            every term as it comes up — including what to do when something looks wrong.
+          </p>
+          <ul class="docs-list">
+            <li>Auto-scan, and what "found in 3 folders" means</li>
+            <li>Pairing on the same network, and across different ones</li>
+            <li>Getting an old save back, and resolving a conflict</li>
+            <li>Saves split across several folders; moving to a new PC</li>
+          </ul>
+          <span class="docs-go">Read the guide &rarr;</span>
+        </a>
+
+        <a class="docs-card" href="cli.html">
+          <span class="docs-key">cli</span>
+          <h3>Command line</h3>
+          <p>
+            Not a cut-down version of the app — the same engine, driven from a
+            terminal. For servers, headless boxes, and a Steam Deck you would rather
+            set up once and never open again.
+          </p>
+          <ul class="docs-list">
+            <li>One-line install, then <code>opensave scan</code></li>
+            <li>Every command grouped, with JSON output on purpose</li>
+            <li>Running as a systemd service</li>
+            <li>Getting a Deck syncing on its own</li>
+          </ul>
+          <span class="docs-go">Read the CLI docs &rarr;</span>
+        </a>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===================== FAQ ===================== -->
+  <section class="section section-tinted" id="faq">
+    <div class="section-container narrow">
+      <div class="section-heading">
+        <span class="section-eyebrow">FAQ</span>
+        <h2>Questions, answered.</h2>
+      </div>
+      <div class="faq-list">
+        <details class="faq-item" open>
+          <summary>Do I need a server or an account?</summary>
+          <p>No. Devices sync directly with each other. The optional relay only matters when syncing across the internet — and you can self-host it with a single binary.</p>
+        </details>
+        <details class="faq-item">
+          <summary>Is it really free?</summary>
+          <p>Yes — free and MIT-licensed open source. No pro tier, no subscription, no ads, no telemetry. It exists because game saves shouldn't be hostage to a storefront.</p>
+        </details>
+        <details class="faq-item">
+          <summary>What if two devices change the same save while offline?</summary>
+          <p>OpenSave records the exact state both devices last agreed on — a shared merge base, like git — and flags a conflict only when <em>both</em> sides changed relative to it. Then it asks what you want: keep yours, keep theirs, or keep both on a new branch. It never silently overwrites a playthrough.</p>
+        </details>
+        <details class="faq-item">
+          <summary>Does it work with emulators and non-Steam games?</summary>
+          <p>Yes — that's the point. It uses a 20,000+ game save-location index, so RetroArch, Dolphin, Ryujinx, yuzu, Citra, PCSX2, RPCS3, PPSSPP, Cemu, GOG, Epic, itch, and Goldberg-style repacks are auto-detected. Anything else can be tracked by pointing at its folder or file.</p>
+        </details>
+        <details class="faq-item">
+          <summary>Does it work on Steam Deck?</summary>
+          <p>Yes. There's an official Flatpak that runs on stock SteamOS in Desktop Mode. It automatically finds saves inside Proton prefixes (where most Deck games store them) along with native Linux and emulator saves.</p>
+        </details>
+        <details class="faq-item">
+          <summary>Is my data safe in transit?</summary>
+          <p>WAN sync goes through a stateless relay that stores nothing, and from 2.4.0 saves are sealed end to end between your two devices: the relay forwards them but cannot read them. It can still see that two devices are talking, roughly how much data moves, and which games by id. Ours runs on our own hardware at <code>wss://relay.opensave.org</code>, and you can replace it with your own in one command. On LAN, devices talk directly and no relay is involved. Saves are only ever persisted on <em>your</em> devices (and, if you enable it, your own cloud storage).</p>
+        </details>
+        <details class="faq-item">
+          <summary>Can I use it without a GUI?</summary>
+          <p>Yes. The headless daemon + <code>opensave-cli</code> covers scan, add, status, snapshot, rollback, branch, and checkout — ideal for servers, NAS boxes, and scripts. Everything is also drivable over a local REST/WebSocket API.</p>
+        </details>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===================== DOWNLOAD ===================== -->
+  <section class="section" id="download">
+    <div class="section-container">
+      <div class="section-heading">
+        <span class="section-eyebrow">Download</span>
+        <h2>Get OpenSave.</h2>
+        <p class="section-sub">Windows, macOS, Linux, and Steam Deck. One small app — install in seconds.</p>
+      </div>
+      <div class="dl-grid">
+        <div class="dl-card" data-platform="windows">
+          <div class="dl-os">windows</div>
+          <h3>Windows</h3>
+          <p>Runs in the tray, updates itself, and can start with Windows. Not sure? The installer's the easy choice.</p>
+          <div class="dl-choices">
+            <a class="btn-primary" data-dl="windows-installer" href="https://github.com/Liquid-co/OpenSave/releases/latest" target="_blank" rel="noopener">
+              Installer
+              <span class="dl-sub">recommended</span>
+            </a>
+            <a class="btn-secondary" data-dl="windows-portable" href="https://github.com/Liquid-co/OpenSave/releases/latest" target="_blank" rel="noopener">
+              Portable
+              <span class="dl-sub">no install</span>
+            </a>
+          </div>
+          <span class="dl-note">OpenSave.Setup.exe · OpenSave.exe</span>
+        </div>
+        <div class="dl-card" data-platform="mac">
+          <div class="dl-os">macos</div>
+          <h3>macOS</h3>
+          <p>One app for Apple Silicon and Intel Macs. The first time, macOS asks before opening it: go to <strong>System Settings → Privacy &amp; Security</strong> and choose <strong>Open Anyway</strong>.</p>
+          <a class="btn-primary" data-dl="mac" href="https://github.com/Liquid-co/OpenSave/releases/latest" target="_blank" rel="noopener">Download for Mac</a>
+          <span class="dl-note">OpenSave-macos.dmg · command line: <a data-dl="mac-cli-arm64" href="https://github.com/Liquid-co/OpenSave/releases/latest" target="_blank" rel="noopener">Apple Silicon</a> · <a data-dl="mac-cli-amd64" href="https://github.com/Liquid-co/OpenSave/releases/latest" target="_blank" rel="noopener">Intel</a></span>
+        </div>
+        <div class="dl-card" data-platform="linux">
+          <div class="dl-os">linux</div>
+          <h3>Linux</h3>
+          <p>Single tarball or an official Flatpak. Extract and run — no dependencies, no sandbox headaches.</p>
+          <a class="btn-primary" data-dl="linux" href="https://github.com/Liquid-co/OpenSave/releases/latest" target="_blank" rel="noopener">Download for Linux</a>
+          <span class="dl-note">opensave-linux-amd64.tar.gz · Flatpak</span>
+        </div>
+        <div class="dl-card" data-platform="linux">
+          <div class="dl-os">steamos</div>
+          <h3>Steam Deck</h3>
+          <p>Install the Flatpak in Desktop Mode — it runs on stock SteamOS and finds your Proton saves automatically. <strong>Not the Linux tarball</strong>: SteamOS ships no WebKitGTK, so that build won't start on a stock Deck.</p>
+          <a class="btn-primary" data-dl="flatpak" href="https://github.com/Liquid-co/OpenSave/releases/latest" target="_blank" rel="noopener">Get the Flatpak</a>
+          <span class="dl-note">runs on stock SteamOS</span>
+        </div>
+      </div>
+      <p class="dl-callout">
+        <strong>Windows: in-app update failed with “Access is denied”?</strong>
+        On some machines the updater can’t write to its own folder under
+        <code>C:\Program&nbsp;Files</code>, and stops rather than risk a half-applied update — nothing is
+        changed and your saves aren’t touched. Download the <strong>Installer</strong> above and run it
+        once; it asks for permission itself and updates in place. You only need to do this the once.
+      </p>
+      <p class="dl-upgrade">
+        <strong>Upgrading from OpenSave 1.x?</strong> Your tracked games, snapshots, pairings, and settings
+        migrate automatically on first launch — and 1.x and 2.x devices can pair and sync with each other
+        during the transition.
+      </p>
+    </div>
+  </section>
+
+  <!-- ===================== FOOTER CTA ===================== -->
+  <section class="section footer-cta">
+    <div class="section-container center">
+      <h2>Stop babysitting save folders.</h2>
+      <p class="section-sub">Set it up once. Your progress follows you for good.</p>
+      <div class="hero-ctas center">
+        <a href="#download" class="btn-primary">Download OpenSave</a>
+        <a href="https://github.com/Liquid-co/OpenSave" class="btn-secondary" target="_blank" rel="noopener">View source on GitHub</a>
+      </div>
+    </div>
+  </section>
+
+  <footer class="footer">
+    <div class="footer-container">
+      <div class="footer-brand">
+        <img src="icon.png?v=2" alt="" class="logo-img">
+        <span class="logo-text">Open<span>Save</span></span>
+      </div>
+      <nav class="footer-links">
+        <a href="getting-started.html">Guide</a>
+        <a href="compare.html">Compare</a>
+        <a href="https://discord.gg/hvBv92DZvn" target="_blank" rel="noopener" class="footer-discord">Discord</a>
+        <a href="https://opensave.gumroad.com/l/usygu" target="_blank" rel="noopener" class="footer-donate">Donate</a>
+        <a href="https://github.com/Liquid-co/OpenSave" target="_blank" rel="noopener">GitHub</a>
+        <a href="https://github.com/Liquid-co/OpenSave/releases" target="_blank" rel="noopener">Releases</a>
+        <a href="cli.html">CLI</a>
+        <a href="https://github.com/Liquid-co/OpenSave/blob/main/USER_GUIDE.md" target="_blank" rel="noopener">User Guide</a>
+        <a href="privacy.html">Privacy</a>
+        <a href="https://github.com/Liquid-co/OpenSave/blob/main/CHANGELOG.md" target="_blank" rel="noopener">Changelog</a>
+        <a href="https://github.com/Liquid-co/OpenSave/issues" target="_blank" rel="noopener">Report a bug</a>
+      </nav>
+      <p class="footer-note">MIT licensed. No accounts. No telemetry. Made for people who love their saves.</p>
+    </div>
+  </footer>
+
+  <!-- lightbox -->
+  <div class="lightbox" id="lightbox" aria-hidden="true">
+    <button class="lightbox-close" id="lightbox-close" aria-label="Close">✕</button>
+    <!-- No src until a screenshot is opened: src="" resolves against the
+         document, so the browser would request this page a second time on
+         every load and log it as a broken image. -->
+    <img id="lightbox-img" alt="">
+  </div>
+
+  <script src="app.js?v=3"></script>
+</body>
+</html>

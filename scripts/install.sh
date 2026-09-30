@@ -1,0 +1,380 @@
+#!/bin/sh
+# OpenSave installer — headless CLI + daemon for Linux.
+#
+#   curl -fsSL https://raw.githubusercontent.com/Liquid-co/OpenSave/main/scripts/install.sh | sh
+#
+# Installs to ~/.local/bin by default, so no root is needed. Override with:
+#   OPENSAVE_INSTALL_DIR=/usr/local/bin   where to put the binaries
+#   OPENSAVE_VERSION=v2.2.0               pin a version instead of latest
+#
+# To remove it again:
+#   install.sh --uninstall                stop the service, remove the binaries,
+#                                         the autostart entry and the PATH line
+#   install.sh --uninstall --purge        also delete ~/.opensave — your settings,
+#                                         pairings, and every local backup
+#
+# Without --purge, uninstalling never touches your saves or your backups. For
+# a tool whose whole job is keeping copies of things, an uninstaller that
+# deletes the copies is the worst bug it could have, so that is a separate,
+# explicit step that says what it will do and asks first.
+#
+# The download is checksum-verified against the SHA256SUMS published with the
+# release. That matters more than usual here: you are piping a script to a
+# shell, so the least this script can do is refuse to install bytes it can't
+# vouch for.
+
+set -eu
+
+REPO="Liquid-co/OpenSave"
+INSTALL_DIR="${OPENSAVE_INSTALL_DIR:-$HOME/.local/bin}"
+VERSION="${OPENSAVE_VERSION:-latest}"
+
+say() { printf '%s\n' "$*"; }
+die() { printf 'error: %s\n' "$*" >&2; exit 1; }
+
+need() {
+    command -v "$1" >/dev/null 2>&1 || die "this installer needs '$1' but it isn't installed"
+}
+
+need uname
+need tar
+need mktemp
+
+# curl or wget, whichever is present.
+if command -v curl >/dev/null 2>&1; then
+    fetch() { curl -fsSL "$1" -o "$2"; }
+    fetch_stdout() { curl -fsSL "$1"; }
+elif command -v wget >/dev/null 2>&1; then
+    fetch() { wget -qO "$2" "$1"; }
+    fetch_stdout() { wget -qO- "$1"; }
+else
+    die "this installer needs curl or wget"
+fi
+
+# ── Uninstall ────────────────────────────────────────────────────────────
+#
+# Reverses exactly what this script and `opensave service install` put down,
+# and nothing it did not: the binaries and their aliases in $INSTALL_DIR, the
+# user systemd unit, the desktop autostart entry, and the PATH line in the
+# shell rc. It removes an alias only if it still points at our binary — the
+# installer skipped "os" when something else owned that name, and so does this.
+
+uninstall() {
+    purge=0
+    for a in "$@"; do
+        case "$a" in
+            --purge) purge=1 ;;
+            --uninstall) ;;
+            *) die "unknown option: $a" ;;
+        esac
+    done
+
+    say "Uninstalling OpenSave…"
+
+    # Stop the daemon first, whichever way it is running, so nothing is
+    # writing to the files being removed.
+    if command -v systemctl >/dev/null 2>&1; then
+        systemctl --user disable --now opensave-daemon.service >/dev/null 2>&1 || true
+    fi
+    if [ -x "$INSTALL_DIR/opensave-cli" ]; then
+        "$INSTALL_DIR/opensave-cli" daemon stop >/dev/null 2>&1 || true
+    fi
+
+    unit_dir="${XDG_CONFIG_HOME:-$HOME/.config}/systemd/user"
+    if [ -f "$unit_dir/opensave-daemon.service" ]; then
+        rm -f "$unit_dir/opensave-daemon.service"
+        command -v systemctl >/dev/null 2>&1 && systemctl --user daemon-reload >/dev/null 2>&1 || true
+        say "  removed $unit_dir/opensave-daemon.service"
+    fi
+
+    autostart="${XDG_CONFIG_HOME:-$HOME/.config}/autostart/opensave.desktop"
+    if [ -f "$autostart" ]; then
+        rm -f "$autostart"
+        say "  removed $autostart"
+    fi
+
+    # Aliases before the binary, and only ones that are ours.
+    for alias_name in opensave os; do
+        link="$INSTALL_DIR/$alias_name"
+        [ -e "$link" ] || [ -L "$link" ] || continue
+        if [ -L "$link" ]; then
+            case "$(readlink "$link")" in
+                opensave-cli|*/opensave-cli) rm -f "$link"; say "  removed $link" ;;
+                *) say "  kept $link — it does not point at OpenSave" ;;
+            esac
+        elif cmp -s "$link" "$INSTALL_DIR/opensave-cli" 2>/dev/null; then
+            rm -f "$link"; say "  removed $link"
+        else
+            say "  kept $link — it is not a copy of OpenSave"
+        fi
+    done
+    for name in opensave-cli opensave-relay; do
+        if [ -f "$INSTALL_DIR/$name" ]; then
+            rm -f "$INSTALL_DIR/$name"
+            say "  removed $INSTALL_DIR/$name"
+        fi
+    done
+
+    # The PATH line: only the block this installer wrote, identified by its
+    # own comment, so a line the user added themselves for the same directory
+    # is left where it is.
+    for rc in "$HOME/.bashrc" "$HOME/.zshrc" "$HOME/.profile"; do
+        [ -f "$rc" ] || continue
+        grep -Fq "# Added by the OpenSave installer" "$rc" || continue
+        tmp="$rc.opensave-uninstall.$$"
+        # Drop the marker comment and the export line that follows it.
+        awk -v dir="$INSTALL_DIR" '
+            /^# Added by the OpenSave installer$/ { skip = 1; next }
+            skip == 1 { skip = 0; if (index($0, dir) > 0 && $0 ~ /^export PATH=/) next }
+            { print }
+        ' "$rc" > "$tmp" && mv -f "$tmp" "$rc"
+        say "  removed PATH entry from $rc"
+    done
+
+    home_dir="$HOME/.opensave"
+    if [ "$purge" = "1" ]; then
+        if [ -d "$home_dir" ]; then
+            backups="$(find "$home_dir/backups" -type f 2>/dev/null | wc -l | tr -d ' ')"
+            say ""
+            say "  --purge will delete $home_dir:"
+            say "    your settings, device key, pairings, and $backups backup file(s)."
+            say "  This cannot be undone."
+            if [ -t 0 ]; then
+                printf "  Type 'delete my backups' to confirm: "
+                read -r reply || reply=""
+                if [ "$reply" != "delete my backups" ]; then
+                    say "  Not deleted. $home_dir is untouched."
+                    purge=0
+                fi
+            else
+                say "  Refusing: --purge needs a terminal to confirm on. Run it interactively."
+                purge=0
+            fi
+            if [ "$purge" = "1" ]; then
+                rm -rf "$home_dir"
+                say "  deleted $home_dir"
+            fi
+        fi
+    elif [ -d "$home_dir" ]; then
+        say ""
+        say "Kept $home_dir — your settings, pairings and local backups."
+        say "To remove those too: install.sh --uninstall --purge"
+    fi
+
+    say ""
+    say "OpenSave is uninstalled. Open a new terminal to drop it from PATH."
+    exit 0
+}
+
+case "${1:-}" in
+    --uninstall) shift; uninstall --uninstall "$@" ;;
+esac
+
+# ── Platform ─────────────────────────────────────────────────────────────
+
+os="$(uname -s)"
+arch="$(uname -m)"
+
+case "$os" in
+    Linux)  platform="linux" ;;
+    Darwin) platform="macos" ;;
+    *) die "unsupported OS: $os" ;;
+esac
+
+case "$arch" in
+    x86_64|amd64) arch="amd64" ;;
+    aarch64|arm64) arch="arm64" ;;
+    *) die "unsupported architecture: $arch" ;;
+esac
+
+ASSET="opensave-${platform}-${arch}.tar.gz"
+
+# What each tarball actually contains, said before the download rather than
+# after: someone installing on a Mac or a Pi should not have to work out from
+# an empty Applications folder that the desktop app was never in there.
+if [ "$platform" = "macos" ]; then
+    say "Note: this installs the CLI and relay. The desktop app is a separate"
+    say "      .dmg on the releases page — it is unsigned, so the first launch"
+    say "      needs right-click -> Open rather than a double-click."
+elif [ "$arch" = "arm64" ]; then
+    say "Note: arm64 ships the CLI and relay only (no desktop app)."
+fi
+
+if [ "$VERSION" = "latest" ]; then
+    BASE="https://github.com/$REPO/releases/latest/download"
+else
+    BASE="https://github.com/$REPO/releases/download/$VERSION"
+fi
+
+# ── Download ─────────────────────────────────────────────────────────────
+
+tmp="$(mktemp -d)"
+# shellcheck disable=SC2064  # expand tmp now, not at trap time
+trap "rm -rf '$tmp'" EXIT INT TERM
+
+say "Downloading OpenSave ($VERSION, linux/$arch)…"
+fetch "$BASE/$ASSET" "$tmp/$ASSET" || die "could not download $BASE/$ASSET"
+
+# Verify against the published checksums when they exist. Releases before
+# 2.2.0 predate SHA256SUMS, so a missing file is a warning, not a failure.
+if fetch "$BASE/SHA256SUMS" "$tmp/SHA256SUMS" 2>/dev/null; then
+    if command -v sha256sum >/dev/null 2>&1; then
+        # Tolerate both sha256sum spellings: "<hash>  file" (text mode) and
+        # "<hash> *file" (binary mode).
+        expected="$(awk -v want="$ASSET" '
+            { name = $NF; sub(/^\*/, "", name)
+              if (name == want) { print $1; exit } }' "$tmp/SHA256SUMS")"
+        actual="$(sha256sum "$tmp/$ASSET" | awk '{print $1}')"
+        [ -n "$expected" ] || die "no checksum for $ASSET in SHA256SUMS"
+        [ "$expected" = "$actual" ] || die "checksum mismatch — refusing to install
+  expected: $expected
+  actual:   $actual"
+        say "Checksum verified."
+    else
+        say "warning: sha256sum not found — skipping checksum verification"
+    fi
+else
+    say "warning: this release publishes no SHA256SUMS — skipping verification"
+fi
+
+# ── Install ──────────────────────────────────────────────────────────────
+
+tar -xzf "$tmp/$ASSET" -C "$tmp" || die "could not extract $ASSET"
+
+# The archive's top-level directory differs by architecture
+# (opensave-linux, opensave-linux-arm64, opensave-macos-arm64), so find it
+# rather than assume.
+src=""
+for candidate in "$tmp"/opensave-"$platform"*; do
+    if [ -d "$candidate" ] && [ -f "$candidate/opensave-cli" ]; then
+        src="$candidate"
+        break
+    fi
+done
+[ -n "$src" ] || die "opensave-cli not found in $ASSET — unexpected archive layout"
+
+mkdir -p "$INSTALL_DIR" || die "could not create $INSTALL_DIR"
+
+install_one() {
+    name="$1"
+    [ -f "$src/$name" ] || return 0
+    cp "$src/$name" "$INSTALL_DIR/$name.new"
+    chmod +x "$INSTALL_DIR/$name.new"
+    # Replace atomically: overwriting a running binary in place fails on Linux
+    # ("text file busy"), and a rename does not.
+    mv -f "$INSTALL_DIR/$name.new" "$INSTALL_DIR/$name"
+    say "  $INSTALL_DIR/$name"
+}
+
+say "Installing…"
+install_one opensave-cli
+install_one opensave-relay
+
+# `opensave` is the name the docs, the man page and the tool's own help use,
+# and what the Windows installer has always produced. `opensave-cli` stays as
+# the real file because the systemd units, the .deb/.rpm layout and the Steam
+# Deck plugin all look it up by that name.
+link_alias() {
+    alias_name="$1"
+    target="$2"
+    [ -f "$INSTALL_DIR/$target" ] || return 0
+
+    # Never displace an unrelated command that happens to share the name —
+    # "os" is short enough to collide with something the user installed.
+    existing="$(command -v "$alias_name" 2>/dev/null || true)"
+    if [ -n "$existing" ] && [ "$existing" != "$INSTALL_DIR/$alias_name" ]; then
+        say "  (skipped '$alias_name' — already taken by $existing)"
+        return 0
+    fi
+
+    # Symlink where possible; some filesystems (a FAT USB stick, a few
+    # container overlays) refuse them, so fall back to a copy.
+    if ! ln -sf "$target" "$INSTALL_DIR/$alias_name" 2>/dev/null; then
+        cp -f "$INSTALL_DIR/$target" "$INSTALL_DIR/$alias_name"
+    fi
+    say "  $INSTALL_DIR/$alias_name"
+}
+
+link_alias opensave opensave-cli
+link_alias os opensave-cli
+
+installed_version="$("$INSTALL_DIR/opensave-cli" version 2>/dev/null || echo "unknown")"
+say ""
+say "Installed: $installed_version"
+
+# ── PATH ─────────────────────────────────────────────────────────────────
+
+# Put the install dir on PATH rather than printing instructions and hoping.
+# Which file to write depends on the login shell: bash reads ~/.bashrc for
+# interactive shells, zsh reads ~/.zshrc, and ~/.profile covers the rest.
+add_to_path() {
+    case ":$PATH:" in
+        *":$INSTALL_DIR:"*) return 0 ;;
+    esac
+
+    line="export PATH=\"\$PATH:$INSTALL_DIR\""
+    case "$(basename "${SHELL:-sh}")" in
+        zsh)  rc="$HOME/.zshrc" ;;
+        bash) rc="$HOME/.bashrc" ;;
+        *)    rc="$HOME/.profile" ;;
+    esac
+
+    # Idempotent: re-running the installer must not stack duplicate lines.
+    if [ -f "$rc" ] && grep -Fq "$INSTALL_DIR" "$rc" 2>/dev/null; then
+        say "PATH already configured in $rc."
+    elif {
+        echo ""
+        echo "# Added by the OpenSave installer"
+        echo "$line"
+    } >> "$rc" 2>/dev/null; then
+        say "Added $INSTALL_DIR to PATH in $rc."
+    else
+        say "warning: could not write $rc — add this line yourself:"
+        say "  $line"
+    fi
+    # This shell too, so the status panel below runs without reopening one.
+    PATH="$PATH:$INSTALL_DIR"
+    export PATH
+    NEW_SHELL_NEEDED=1
+}
+
+NEW_SHELL_NEEDED=0
+add_to_path
+
+# ── Show what it found ───────────────────────────────────────────────────
+
+say ""
+"$INSTALL_DIR/opensave-cli" || true
+
+if [ "$NEW_SHELL_NEEDED" = "1" ]; then
+    say "Open a new terminal (or run: . $rc) for 'opensave' to work everywhere."
+    say ""
+fi
+
+# ── Relay secrets ────────────────────────────────────────────────────────
+#
+# Offered, not assumed. Most people installing this are setting up a client and
+# will never run a relay, so prompting everyone for a Google client secret would
+# be noise — and a prompt nobody understands is one people paste anything into.
+#
+# Skipped entirely when stdin is not a terminal: an install piped from curl has
+# no one to answer, and stopping there to wait would hang the pipeline.
+if [ -t 0 ] && [ -x "$INSTALL_DIR/opensave-relay" ]; then
+    say ""
+    printf "Configure relay secrets now (cloud sync, cover art)? [y/N] "
+    read -r reply || reply=""
+    case "$reply" in
+        [Yy]*) "$INSTALL_DIR/opensave-relay" setup || true ;;
+        *)     say "  Skipped — run 'opensave-relay setup' whenever you like." ;;
+    esac
+fi
+
+say "Next:"
+say "  opensave scan                 find your game saves"
+say "  opensave daemon start         run the sync service"
+say "  opensave service install      run it automatically on login"
+say "  opensave pair <other-device>  pair another machine"
+say "  opensave-relay setup          store this relay's secrets (relay hosts only)"
+say ""
+say "'os' works as a short alias for 'opensave'."
+say "On a Steam Deck, also run: sudo loginctl enable-linger \$USER"
