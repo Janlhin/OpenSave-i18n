@@ -9,33 +9,35 @@ const DAY = 24 * HOUR;
 
 describe('timeAgo', () => {
   it.each([
-    [ago(0), 'just now'],
-    [ago(30_000), 'just now'],
+    [ago(0), '刚刚'],
+    [ago(30_000), '刚刚'],
     // A peer's clock a few seconds ahead of ours must not print a negative age.
-    [ago(-5_000), 'just now'],
-    [ago(60_000), 'a minute ago'],
-    [ago(4 * MIN), '4 min ago'],
-    [ago(59 * MIN), '59 min ago'],
-    [ago(70 * MIN), 'an hour ago'],
-    [ago(5 * HOUR), '5 hours ago'],
-    [ago(26 * HOUR), 'yesterday'],
-    [ago(3 * DAY), '3 days ago'],
+    [ago(-5_000), '刚刚'],
+    [ago(60_000), '1 分钟前'],
+    [ago(4 * MIN), '4 分钟前'],
+    [ago(59 * MIN), '59 分钟前'],
+    [ago(70 * MIN), '1 小时前'],
+    [ago(5 * HOUR), '5 小时前'],
+    [ago(26 * HOUR), '昨天'],
+    [ago(3 * DAY), '3 天前'],
   ])('%s → %s', (iso, want) => {
     expect(timeAgo(iso, now)).toBe(want);
   });
 
   it('reads the daemon\'s millisecond form and the import\'s plain RFC 3339 alike', () => {
-    expect(timeAgo('2026-09-21T11:50:00.000Z', now)).toBe('10 min ago');
-    expect(timeAgo('2026-09-21T11:50:00Z', now)).toBe('10 min ago');
+    expect(timeAgo('2026-09-21T11:50:00.000Z', now)).toBe('10 分钟前');
+    expect(timeAgo('2026-09-21T11:50:00Z', now)).toBe('10 分钟前');
   });
 
   it('gives a date beyond a week', () => {
-    expect(timeAgo(ago(30 * DAY), now)).toMatch(/^on /);
+    expect(timeAgo(ago(30 * DAY), now)).toBe(
+      new Date(Date.parse(ago(30 * DAY))).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' })
+    );
   });
 
   it('says never for nothing, and shows garbage rather than hiding it', () => {
-    expect(timeAgo('', now)).toBe('never');
-    expect(timeAgo(undefined, now)).toBe('never');
+    expect(timeAgo('', now)).toBe('从未');
+    expect(timeAgo(undefined, now)).toBe('从未');
     expect(timeAgo('not a time', now)).toBe('not a time');
   });
 });

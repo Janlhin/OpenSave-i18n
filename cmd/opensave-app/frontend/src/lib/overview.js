@@ -38,7 +38,7 @@ export function recentEvents(games, peers = {}, { limit = 5, now = new Date() } 
       // A device since unpaired still has its time on record; it is not news.
       if (!(peerId in peers)) continue;
       const at = ms(stamp);
-      if (Number.isFinite(at)) events.push({ kind: 'sync', game, title: `Synced with ${peers[peerId].name ?? 'a device'}`, at });
+      if (Number.isFinite(at)) events.push({ kind: 'sync', game, title: `与 ${peers[peerId].name ?? '某台设备'} 同步`, at });
     }
   }
   events.sort((a, b) => b.at - a.at);

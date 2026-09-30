@@ -43,12 +43,12 @@
 
 <div class="recent">
   <div class="head">
-    <span class="label">Recent</span>
-    <button class="more" on:click={() => navigate('activity')}>All activity<ArrowRight size={12} /></button>
+    <span class="label">最近动态</span>
+    <button class="more" on:click={() => navigate('activity')}>全部动态<ArrowRight size={12} /></button>
   </div>
   <div class="row" bind:clientWidth={width} style="grid-template-columns: repeat({fit}, minmax(0, 1fr))">
     {#if events.length === 0}
-      <p class="empty">Nothing yet. Snapshots and syncs show up here as they happen.</p>
+      <p class="empty">暂无内容。快照和同步发生后会显示在这里。</p>
     {:else}
       {#each shown as e (`${e.game.id}:${e.kind}:${e.at}`)}
         <button class="item" on:click={() => navigate('game', { gameId: e.game.id })} title={new Date(e.at).toLocaleString()}>

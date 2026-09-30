@@ -7,17 +7,17 @@ const at = (h, m = 0, day = 25) => new Date(2026, 8, day, h, m).getTime();
 suite('timeline', () => {
   it('says each kind of event plainly', () => {
     expect(describe({ kind: 'received', device: 'Steam Deck', files: 3, bytes: 2048 }, now)).toMatchObject({
-      title: 'Got 3 files from Steam Deck',
+      title: '从 Steam Deck 收到 3 个文件',
       detail: '2.0 KB'
     });
-    expect(describe({ kind: 'sent', device: 'Laptop', files: 1 }, now).title).toBe('Laptop took 1 file from here');
-    expect(describe({ kind: 'played', durationMs: 72 * 60_000 }, now).title).toBe('Played for 1 h 12 min');
+    expect(describe({ kind: 'sent', device: 'Laptop', files: 1 }, now).title).toBe('Laptop 从这里取走了 1 个文件');
+    expect(describe({ kind: 'played', durationMs: 72 * 60_000 }, now).title).toBe('游玩了 1 小时 12 分钟');
     expect(describe({ kind: 'snapshot', comment: 'Synced from peer: Deck (Save changed)', device: 'Deck', auto: true }, now).title).toBe(
-      "Kept a copy of Deck's save"
+      '保留了 Deck 存档的副本'
     );
     expect(describe({ kind: 'snapshot', comment: 'Before the boss', auto: false }, now)).toMatchObject({
-      title: 'Snapshot: Before the boss',
-      detail: 'Taken by you'
+      title: '快照：Before the boss',
+      detail: '由你手动创建'
     });
     expect(describe({ kind: 'emptied', files: 4 }, now).tone).toBe('warn');
   });
@@ -47,12 +47,12 @@ suite('timeline', () => {
     expect(filterItems(items, 'syncs').map((i) => i.kind)).toEqual(['received']);
     expect(filterItems([{ kind: 'conflict', gameId: 'a' }, { kind: 'emptied', gameId: 'a' }], 'syncs')).toHaveLength(2);
     expect(filterItems(items, 'all', 'b').map((i) => i.gameId)).toEqual(['b']);
-    expect(byDay(runs(items, now), now).map((d) => d.day)).toEqual(['Today', 'Yesterday']);
+    expect(byDay(runs(items, now), now).map((d) => d.day)).toEqual(['今天', '昨天']);
   });
 
   it('says where a game was last played', () => {
     expect(playedWhere({ lastPlayedAt: 1, lastPlayedOn: 'Steam Deck' }, 'Gaming PC')).toBe('Steam Deck');
-    expect(playedWhere({ lastPlayedAt: 1 }, 'Gaming PC')).toBe('Gaming PC (here)');
+    expect(playedWhere({ lastPlayedAt: 1 }, 'Gaming PC')).toBe('Gaming PC（本机）');
     expect(playedWhere({}, 'Gaming PC')).toBe('');
   });
 });

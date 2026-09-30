@@ -75,7 +75,7 @@
   async function run() {
     const chosen = (items ?? []).filter((it) => sel[it.id]);
     if (!chosen.length) return;
-    const target = await native.selectSaveFile('Export selected saves', 'opensave-saves.sscb');
+    const target = await native.selectSaveFile('导出所选存档', 'opensave-saves.sscb');
     if (!target) return;
     exporting = true;
     try {
@@ -88,9 +88,9 @@
       // snapshot; say so, since that is not the save as it stands.
       const fromSnap = res.fromSnapshot?.length ?? 0;
       toast(
-        `Exported ${res.exported} save${res.exported === 1 ? '' : 's'}` +
-          (fromSnap ? ` — ${fromSnap === 1 ? res.fromSnapshot[0].name : `${fromSnap} games`} from the newest snapshot, as the save folder was empty or missing` : '') +
-          (skipped ? `, ${skipped} skipped — see Activity` : ''),
+        `已导出 ${res.exported} 个存档` +
+          (fromSnap ? ` —— ${fromSnap === 1 ? res.fromSnapshot[0].name : `${fromSnap} 个游戏`} 因存档文件夹为空或缺失而取自最新快照` : '') +
+          (skipped ? `，跳过 ${skipped} 个——详见活动记录` : ''),
         skipped ? 'info' : 'success'
       );
       close();
@@ -102,30 +102,29 @@
   }
 </script>
 
-<Modal title="Export saves" icon={Package} onClose={close}>
+<Modal title="导出存档" icon={Package} onClose={close}>
   <svelte:fragment slot="sub">
     {#if !items}
-      Looking for saves on this machine…
+      正在本机查找存档…
     {:else}
-      {count} of {items.length} selected — each game's current save is exported
-      along with where it belongs
+      已选 {count} / {items.length} —— 每个游戏的当前存档会连同其所属位置一并导出
     {/if}
   </svelte:fragment>
 
   {#if !items}
-    <ModalLoading>Listing tracked games and scanning for saves…</ModalLoading>
+    <ModalLoading>正在列出已跟踪的游戏并扫描存档…</ModalLoading>
   {:else}
     <div class="toolbar">
       <button class="btn small" on:click={() => setAll(!allSelected)}>
-        {allSelected ? 'Unselect all' : 'Select all'}
+        {allSelected ? '全不选' : '全选'}
       </button>
-      <button class="btn small" on:click={() => { setAll(false); setAll(true, true); }}>Tracked only</button>
+      <button class="btn small" on:click={() => { setAll(false); setAll(true, true); }}>仅已跟踪</button>
     </div>
     <div class="list">
       {#if items.length === 0}
         <div class="empty-state">
           <div class="empty-icon"><Package size={36} strokeWidth={1.5} /></div>
-          <p>No saves found to export.</p>
+          <p>没有找到可导出的存档。</p>
         </div>
       {:else}
         <div class="grid">
@@ -135,7 +134,7 @@
               title={it.savePath}
               src={it.cover}
               selected={!!sel[it.id]}
-              badge={it.tracked ? 'Tracked' : 'Detected'}
+              badge={it.tracked ? '已跟踪' : '已检测'}
               on:activate={() => (sel[it.id] = !sel[it.id])}
             />
           {/each}
@@ -144,16 +143,16 @@
     </div>
     {#if exporting && prog}
       <ProgressBar done={prog.done} total={prog.total}>
-        Exporting {Math.min(prog.done + 1, prog.total)} of {prog.total}
+        正在导出第 {Math.min(prog.done + 1, prog.total)} 个，共 {prog.total} 个
         {#if prog.current}&nbsp;— <code>{prog.current}</code>{/if}
       </ProgressBar>
     {/if}
     <ModalFoot>
-      <span class="quiet">Detected saves export fine without being tracked.</span>
+      <span class="quiet">检测到的存档无需跟踪即可直接导出。</span>
       <div class="actions">
-        <button class="btn" on:click={close}>Cancel</button>
+        <button class="btn" on:click={close}>取消</button>
         <button class="btn primary" disabled={exporting || count === 0} on:click={run}>
-          {exporting ? 'Exporting…' : `Export ${count} save${count === 1 ? '' : 's'}`}
+          {exporting ? '导出中…' : `导出 ${count} 个存档`}
         </button>
       </div>
     </ModalFoot>

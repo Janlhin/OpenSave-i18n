@@ -12,20 +12,20 @@ const HOUR = 60 * MIN;
 const DAY = 24 * HOUR;
 
 export function timeAgo(iso, now = Date.now()) {
-  if (!iso) return 'never';
+  if (!iso) return '从未';
   const t = Date.parse(iso);
   if (Number.isNaN(t)) return String(iso);
   const d = now - t;
   // A stamp a few seconds in the future is a peer's clock running slightly
   // ahead, not a negative age.
-  if (d < 45 * SEC) return 'just now';
-  if (d < 90 * SEC) return 'a minute ago';
-  if (d < HOUR) return `${Math.round(d / MIN)} min ago`;
-  if (d < 90 * MIN) return 'an hour ago';
-  if (d < DAY) return `${Math.round(d / HOUR)} hours ago`;
-  if (d < 36 * HOUR) return 'yesterday';
-  if (d < 7 * DAY) return `${Math.round(d / DAY)} days ago`;
-  return 'on ' + new Date(t).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' });
+  if (d < 45 * SEC) return '刚刚';
+  if (d < 90 * SEC) return '1 分钟前';
+  if (d < HOUR) return `${Math.round(d / MIN)} 分钟前`;
+  if (d < 90 * MIN) return '1 小时前';
+  if (d < DAY) return `${Math.round(d / HOUR)} 小时前`;
+  if (d < 36 * HOUR) return '昨天';
+  if (d < 7 * DAY) return `${Math.round(d / DAY)} 天前`;
+  return new Date(t).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' });
 }
 
 // The newest of several stamps, or null when there are none. Used where one

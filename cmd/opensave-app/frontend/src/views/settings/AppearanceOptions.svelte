@@ -14,7 +14,7 @@
 
 <div class="options">
   <div class="group">
-    <span class="label" id="ap-theme">Theme</span>
+    <span class="label" id="ap-theme">主题</span>
     <div class="segmented" role="radiogroup" aria-labelledby="ap-theme" use:slidingIndicator={{ mode: 'fill' }}>
       {#each Object.entries(THEMES) as [id, label]}
         <button role="radio" aria-checked={$appearance.theme === id} class:on={$appearance.theme === id} on:click={() => set({ theme: id })}>
@@ -25,7 +25,7 @@
   </div>
 
   <div class="group">
-    <span class="label" id="ap-accent">Accent colour</span>
+    <span class="label" id="ap-accent">强调色</span>
     <div class="swatches" role="radiogroup" aria-labelledby="ap-accent">
       {#each Object.entries(ACCENTS) as [id, a]}
         <button
@@ -44,10 +44,10 @@
   </div>
 
   <label class="group">
-    <span class="label">Size</span>
+    <span class="label">大小</span>
     <select value={String($appearance.scale)} on:change={(e) => set({ scale: Number(e.currentTarget.value) })}>
       {#each SCALES as s}
-        <option value={String(s)}>{Math.round(s * 100)}%{s === 1 ? ' (default)' : ''}</option>
+        <option value={String(s)}>{Math.round(s * 100)}%{s === 1 ? '（默认）' : ''}</option>
       {/each}
     </select>
   </label>
@@ -55,12 +55,12 @@
 
 <label class="check motion">
   <input type="checkbox" checked={$appearance.motion} on:change={(e) => set({ motion: e.currentTarget.checked })} />
-  Animations
+  动画
 </label>
 <p class="hint">
-  Small movements as pages, dialogs and your library come into view, and as you point at a game.
+  页面、对话框和游戏库进入视野时以及指针悬停在游戏上时的细微动效。
   {#if $systemReducesMotion}
-    Off for now whatever this says: Windows is asking apps to reduce motion.
+    无论此项如何设置，当前都已关闭：Windows 正在要求应用减少动效。
   {/if}
 </p>
 

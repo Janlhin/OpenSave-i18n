@@ -45,13 +45,13 @@
 
   async function remove(c) {
     const n = c.gameIds.length;
-    if (!(await askConfirm(`Delete the collection “${c.name}”? ${n ? `Its ${n} game${n === 1 ? '' : 's'} stay tracked; only the grouping goes.` : 'It is empty.'}`, { title: 'Delete collection?', confirmText: 'Delete', danger: true }))) return;
+    if (!(await askConfirm(`确定删除合集“${c.name}”吗？${n ? `其中的 ${n} 个游戏仍会保持跟踪，只会移除这个分组。` : '该合集是空的。'}`, { title: '删除合集？', confirmText: '删除', danger: true }))) return;
     await deleteCollection(c.id);
   }
 </script>
 
 {#if game}
-  <Modal title="Collections" icon={Tags} onClose={close} width={460} height="auto" maxHeight="min(78vh, 620px)">
+  <Modal title="合集" icon={Tags} onClose={close} width={460} height="auto" maxHeight="min(78vh, 620px)">
     <svelte:fragment slot="sub">{game.name}</svelte:fragment>
     <div class="body">
       <ul>
@@ -80,22 +80,22 @@
                 <span class="count">{c.gameIds.length}</span>
               </label>
               {#if !c.builtin}
-                <button class="btn small ghost icon" title="Rename" aria-label="Rename {c.name}" on:click={() => startRename(c)}><Pencil size={13} /></button>
-                <button class="btn small ghost icon" title="Delete" aria-label="Delete {c.name}" on:click={() => remove(c)}><Trash2 size={13} /></button>
+                <button class="btn small ghost icon" title="重命名" aria-label="重命名 {c.name}" on:click={() => startRename(c)}><Pencil size={13} /></button>
+                <button class="btn small ghost icon" title="删除" aria-label="删除 {c.name}" on:click={() => remove(c)}><Trash2 size={13} /></button>
               {/if}
             {/if}
           </li>
         {/each}
       </ul>
       <form class="new" on:submit|preventDefault={add}>
-        <input placeholder="New collection, e.g. Playing now" maxlength="40" bind:value={newName} />
-        <button class="btn small" type="submit" disabled={!newName.trim()}><Plus size={14} />Add</button>
+        <input placeholder="新建合集，例如：正在游玩" maxlength="40" bind:value={newName} />
+        <button class="btn small" type="submit" disabled={!newName.trim()}><Plus size={14} />添加</button>
       </form>
-      <p class="hint">Collections are for finding games in the library; they don't change how a game syncs.</p>
+      <p class="hint">合集用于在游戏库中查找游戏；不会改变游戏的同步方式。</p>
     </div>
     <ModalFoot>
       <span></span>
-      <button class="btn primary" on:click={close}>Done</button>
+      <button class="btn primary" on:click={close}>完成</button>
     </ModalFoot>
   </Modal>
 {/if}

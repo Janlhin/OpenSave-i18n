@@ -29,11 +29,11 @@
 {#if many}
   <label class="search">
     <Search size={14} />
-    <input type="search" placeholder="Find a game…" bind:value={query} aria-label="Find a game to link" />
+    <input type="search" placeholder="查找游戏…" bind:value={query} aria-label="查找要关联的游戏" />
   </label>
 {/if}
 
-{#each [['On this device', 'Its entry here merges into this one', local, false], ['On your other devices', 'Nothing is removed on either device', remote, true]] as [title, note, list, onPeer]}
+{#each [['在本设备上', '它在这里的条目会合并到本游戏中', local, false], ['在你的其他设备上', '任何一台设备都不会删除内容', remote, true]] as [title, note, list, onPeer]}
   {#if list.length}
     <div class="group-head">
       <span class="title">{title}</span><span class="note">{note}</span>
@@ -45,7 +45,7 @@
           role="radio"
           aria-checked={selected === g.id}
           class:on={selected === g.id}
-          title={onPeer ? `${g.name} on ${g.peerName}` : `${g.name} — ${g.savePath}`}
+          title={onPeer ? `${g.peerName} 上的 ${g.name}` : `${g.name} — ${g.savePath}`}
           on:click={() => (selected = selected === g.id ? '' : g.id)}
         >
           <span class="cover">
@@ -61,7 +61,7 @@
   {/if}
 {/each}
 {#if many && local.length === 0 && remote.length === 0}
-  <p class="none">No game matches “{query}”.</p>
+  <p class="none">没有游戏匹配“{query}”。</p>
 {/if}
 
 <style>

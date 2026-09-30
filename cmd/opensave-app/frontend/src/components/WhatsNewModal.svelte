@@ -24,13 +24,13 @@
 <svelte:window on:keydown={onKeydown} />
 
 <div class="backdrop" use:backdropClose={onClose} role="presentation" out:dialogOut|global>
-  <div class="modal" role="dialog" aria-modal="true" aria-label="What's new in OpenSave">
-    <button class="btn ghost icon x" on:click={onClose} title="Close" aria-label="Close"><X size={18} /></button>
+  <div class="modal" role="dialog" aria-modal="true" aria-label="OpenSave 新变化">
+    <button class="btn ghost icon x" on:click={onClose} title="关闭" aria-label="关闭"><X size={18} /></button>
 
     <div class="hero">
-      <div class="badge">Updated</div>
+      <div class="badge">已更新</div>
       <h2>OpenSave {version}</h2>
-      {#if from}<p class="from">You were on {from}</p>{/if}
+      {#if from}<p class="from">你之前使用的是 {from}</p>{/if}
     </div>
 
     <div class="body">
@@ -39,8 +39,8 @@
     </div>
 
     <footer>
-      <button class="btn" on:click={openFullChangelog}>Full changelog</button>
-      <button class="btn primary" on:click={onClose}>Got it</button>
+      <button class="btn" on:click={openFullChangelog}>完整更新日志</button>
+      <button class="btn primary" on:click={onClose}>知道了</button>
     </footer>
   </div>
 </div>

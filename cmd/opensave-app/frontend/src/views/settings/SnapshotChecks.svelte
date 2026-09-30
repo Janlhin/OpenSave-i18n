@@ -32,11 +32,11 @@
     try {
       const report = await api.post('/api/snapshots/check', {});
       summary = report.summary;
-      const fixed = report.repaired ? ` — ${report.repaired} put back from the cloud` : '';
+      const fixed = report.repaired ? ` —— ${report.repaired} 个已从云端放回` : '';
       toast(
         report.damaged.length
-          ? `${report.damaged.length} of ${report.checked} snapshots can't be restored${fixed}`
-          : `Checked ${report.checked} snapshots — every one can be restored${fixed}`,
+          ? `${report.checked} 个快照中有 ${report.damaged.length} 个无法恢复${fixed}`
+          : `已检查 ${report.checked} 个快照——全部可以恢复${fixed}`,
         report.damaged.length ? 'error' : 'success'
       );
       settings.update((s) => (s ? { ...s, lastVerifyMs: Date.now() } : s));
@@ -56,13 +56,13 @@
       const back = r.repaired.length;
       const left = r.remaining.length;
       if (!r.cloudChecked) {
-        toast(`Couldn't look in the cloud: ${r.cloudError}`, 'error');
+        toast(`无法查看云端：${r.cloudError}`, 'error');
       } else if (back && left) {
-        toast(`Put back ${back} from the cloud; ${left} have no copy there`, 'success');
+        toast(`已从云端放回 ${back} 个；${left} 个在云端没有副本`, 'success');
       } else if (back) {
-        toast(`Put back all ${back} from the cloud`, 'success');
+        toast(`已从云端放回全部 ${back} 个`, 'success');
       } else {
-        toast(`None of them have a copy in the cloud`, 'info');
+        toast(`它们在云端都没有副本`, 'info');
       }
     } catch (e) {
       toast(e.message, 'error');
@@ -75,14 +75,14 @@
   async function removeDamaged() {
     const n = summary.damaged.length;
     const ok = await askConfirm(
-      `Remove the ${n} snapshot${n === 1 ? '' : 's'} that can't be restored from the history? Their archives are already gone or damaged, so nothing that could be restored is lost; every other snapshot stays.`,
-      { title: 'Remove them?', confirmText: `Remove ${n}`, danger: true }
+      `从历史中移除 ${n} 个无法恢复的快照？它们的存档文件已丢失或损坏，因此不会失去任何可恢复的内容；其他所有快照都会保留。`,
+      { title: '移除这些快照？', confirmText: `移除 ${n}`, danger: true }
     );
     if (!ok) return;
     removing = true;
     try {
       const r = await api.post('/api/snapshots/forget-damaged', {});
-      toast(`Removed ${r.removed.length} snapshot${r.removed.length === 1 ? '' : 's'} that couldn't be restored`, 'success');
+      toast(`已移除 ${r.removed.length} 个无法恢复的快照`, 'success');
     } catch (e) {
       toast(e.message, 'error');
     } finally {
@@ -93,11 +93,11 @@
 
   // How often it happens by itself: a daemon setting (verify_every_days).
   const EVERY = [
-    [1, 'every day'],
-    [3, 'every 3 days'],
-    [7, 'every week'],
-    [14, 'every 2 weeks'],
-    [30, 'every month']
+    [1, '每天'],
+    [3, '每 3 天'],
+    [7, '每周'],
+    [14, '每 2 周'],
+    [30, '每月']
   ];
   async function setEvery(days) {
     try {
@@ -124,8 +124,8 @@
   ).sort((a, b) => b[1].length - a[1].length);
   function inWords(ms) {
     const days = Math.round((ms - Date.now()) / 86_400_000);
-    if (days <= 0) return 'soon';
-    return days === 1 ? 'tomorrow' : `in ${days} days`;
+    if (days <= 0) return '即将进行';
+    return days === 1 ? '明天' : `${days} 天后`;
   }
 </script>
 
@@ -135,18 +135,18 @@
       {#if summary.damaged.length}
         <TriangleAlert size={18} />
         <span>
-          <strong>{summary.damaged.length} {summary.damaged.length === 1 ? "snapshot can't" : "snapshots can't"} be restored.</strong>
-          Their archives were deleted or damaged outside OpenSave. Every other snapshot is fine, and so is each game's save.
+          <strong>{summary.damaged.length} 个快照无法恢复。</strong>
+          它们的存档文件在 OpenSave 之外被删除或损坏。其他所有快照都完好，每个游戏的存档也正常。
         </span>
       {:else if summary.lastCheckedMs}
         <FileCheck size={18} />
         <span>
-          <strong>Every snapshot checked can be restored.</strong>
-          {summary.checked} of {summary.total} checked, last {timeAgo(iso(summary.lastCheckedMs))}.
+          <strong>检查过的快照全部可以恢复。</strong>
+          已检查 {summary.checked} / {summary.total} 个，上次检查于 {timeAgo(iso(summary.lastCheckedMs))}。
         </span>
       {:else}
         <FileCheck size={18} />
-        <span>Not checked yet.</span>
+        <span>尚未检查。</span>
       {/if}
     </div>
 
@@ -155,22 +155,22 @@
         {#each byGame as [gameId, list] (gameId)}
           <li>
             <button class="linklike" on:click={() => navigate('game', { gameId, snapshot: list[0].id })}>{nameOf(gameId)}</button>
-            <span class="count">{list.length} snapshot{list.length === 1 ? '' : 's'}, {whenLabel(list[list.length - 1].timestamp)}{list.length > 1 ? ` to ${whenLabel(list[0].timestamp)}` : ''}</span>
+            <span class="count">{list.length} 个快照，{whenLabel(list[list.length - 1].timestamp)}{list.length > 1 ? ` 至 ${whenLabel(list[0].timestamp)}` : ''}</span>
           </li>
         {/each}
       </ul>
       <div class="fix">
         <button class="btn small primary" disabled={repairing || removing} on:click={repair}>
-          <CloudDownload size={14} />{repairing ? 'Looking in the cloud…' : 'Look for copies in the cloud'}
+          <CloudDownload size={14} />{repairing ? '正在查看云端…' : '在云端寻找副本'}
         </button>
         <button class="btn small" disabled={repairing || removing} on:click={removeDamaged}>
-          <Trash2 size={14} />{removing ? 'Removing…' : 'Remove them from the history'}
+          <Trash2 size={14} />{removing ? '正在移除…' : '从历史中移除'}
         </button>
-        <button class="linklike quiet" on:click={() => (details = !details)}>{details ? 'Hide details' : 'Details'}</button>
+        <button class="linklike quiet" on:click={() => (details = !details)}>{details ? '收起详情' : '详情'}</button>
       </div>
       <p class="hint">
-        With cloud backup on, each snapshot was uploaded as it was taken: a whole copy there is fetched, checked and put back.
-        What has no copy anywhere can only be removed — the record promises a save that no longer exists.
+        开启云备份后，每个快照在创建时都已上传：云端若有完整副本，会取回、校验并放回原处。
+        任何地方都没有副本的快照只能移除——这条记录指向一个已不存在的存档。
       </p>
       {#if details}
         <ul class="damaged">
@@ -190,24 +190,24 @@
   <div class="schedule">
     <label class="toggle">
       <input type="checkbox" checked={auto} on:change={(e) => setEvery(e.currentTarget.checked ? lastEvery : 0)} />
-      Check automatically
+      自动检查
     </label>
     {#if auto}
-      <select value={every} on:change={(e) => setEvery(Number(e.currentTarget.value))} aria-label="How often">
+      <select value={every} on:change={(e) => setEvery(Number(e.currentTarget.value))} aria-label="检查频率">
         {#each EVERY as [days, label]}
           <option value={days}>{label}</option>
         {/each}
-        {#if !EVERY.some(([d]) => d === every)}<option value={every}>every {every} days</option>{/if}
+        {#if !EVERY.some(([d]) => d === every)}<option value={every}>每 {every} 天</option>{/if}
       </select>
-      <span class="hint">{nextAt ? `Next ${inWords(nextAt)}.` : 'The first a little after OpenSave starts.'} Anything the cloud still has whole is put back as it's found.</span>
+      <span class="hint">{nextAt ? `下次 ${inWords(nextAt)}。` : '首次检查在 OpenSave 启动后稍后进行。'}云端仍完整保存的内容会随发现随放回。</span>
     {:else}
-      <span class="hint">Snapshots are still checked before they're restored.</span>
+      <span class="hint">快照在恢复之前仍会进行检查。</span>
     {/if}
   </div>
 
   <div class="actions">
-    <button class="btn small" disabled={checking} on:click={checkNow}>{checking ? 'Checking…' : 'Check every snapshot now'}</button>
-    <span class="hint">Each is read back in full and every file compared with its checksum. A snapshot is also checked before it is restored.</span>
+    <button class="btn small" disabled={checking} on:click={checkNow}>{checking ? '检查中…' : '立即检查所有快照'}</button>
+    <span class="hint">每个快照都会完整读回，并逐一比对文件校验和。快照在恢复之前也会进行检查。</span>
   </div>
 </div>
 

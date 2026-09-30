@@ -40,8 +40,8 @@
   <div class="drop">
     <div class="box">
       <FolderPlus size={34} strokeWidth={1.6} />
-      <strong>Drop a save folder to track it</strong>
-      <span>You'll get to check its name first.</span>
+      <strong>拖入存档文件夹以开始跟踪</strong>
+      <span>添加前你可以先确认名称。</span>
     </div>
   </div>
 {/if}

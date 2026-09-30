@@ -11,19 +11,19 @@
 
   // What each button does, in the order someone reaches for them.
   const BUTTONS = [
-    { keys: ['D-pad', 'Left stick'], does: 'Move between games, buttons and fields' },
-    { keys: ['A'], does: 'Press what is highlighted' },
-    { keys: ['B'], does: 'Close what is open, or go back' },
-    { keys: ['X'], does: "Open the highlighted game's menu" },
-    { keys: ['Y', 'Start'], does: 'Quick switcher (Ctrl+K)' },
-    { keys: ['LB', 'RB'], does: 'Previous or next page' }
+    { keys: ['D-pad', 'Left stick'], does: '在游戏、按钮和输入框之间移动' },
+    { keys: ['A'], does: '按下当前高亮的内容' },
+    { keys: ['B'], does: '关闭当前打开的内容，或返回' },
+    { keys: ['X'], does: "打开高亮游戏的菜单" },
+    { keys: ['Y', 'Start'], does: '快速切换器（Ctrl+K）' },
+    { keys: ['LB', 'RB'], does: '上一页或下一页' }
   ];
 
   $: active = controllerOn($appearance.controller, { deviceType: $settings?.deviceType, used: $padUsed });
 </script>
 
 <div class="row">
-  <div class="segmented" role="radiogroup" aria-label="Controller" use:slidingIndicator={{ mode: 'fill' }}>
+  <div class="segmented" role="radiogroup" aria-label="手柄" use:slidingIndicator={{ mode: 'fill' }}>
     {#each Object.entries(CONTROLLER_MODES) as [id, label]}
       <button role="radio" aria-checked={$appearance.controller === id} class:on={$appearance.controller === id} on:click={() => set({ controller: id })}>
         {label}
@@ -31,22 +31,22 @@
     {/each}
   </div>
   <span class="state" class:is-on={active}>
-    {#if $appearance.controller === 'on'}On
-    {:else if $appearance.controller === 'off'}Off — the arrow keys scroll as usual
-    {:else if active}On now — a controller was used, or this is a Steam Deck or handheld
-    {:else}Turns on when a controller is used, and on a Steam Deck or handheld{/if}
+    {#if $appearance.controller === 'on'}已开启
+    {:else if $appearance.controller === 'off'}已关闭——方向键照常滚动页面
+    {:else if active}当前已开启——检测到手柄，或这是 Steam Deck 或掌机
+    {:else}使用手柄时自动开启，Steam Deck 或掌机上也是如此{/if}
   </span>
 </div>
 
-<dl class="buttons" aria-label="What the buttons do">
+<dl class="buttons" aria-label="各按键的作用">
   {#each BUTTONS as b}
     <dt>
-      {#each b.keys as k, i}{#if i > 0}<span class="or">or</span>{/if}<kbd>{k}</kbd>{/each}
+      {#each b.keys as k, i}{#if i > 0}<span class="or">或</span>{/if}<kbd>{k}</kbd>{/each}
     </dt>
     <dd>{b.does}</dd>
   {/each}
 </dl>
-<p class="hint">The arrow keys do the same while it's on — a Steam Deck in desktop mode sends them for the D-pad.</p>
+<p class="hint">开启后方向键的作用不变——桌面模式下的 Steam Deck 会把十字键输入为方向键。</p>
 
 <style>
   .row {

@@ -43,12 +43,11 @@ export function summarize(preview) {
   };
 }
 
-/** "2 files change, 1 comes back, 1 is removed" — only the parts that apply. */
+/** "2 个文件将被更改，1 个将被恢复，1 个将被删除" — only the parts that apply. */
 export function describeSummary(s) {
-  const n = (k, one, many) => `${k} ${k === 1 ? one : many}`;
   const parts = [];
-  if (s.changed) parts.push(n(s.changed, 'file changes', 'files change'));
-  if (s.restored) parts.push(`${s.restored} ${s.restored === 1 ? 'comes' : 'come'} back`);
-  if (s.removed) parts.push(`${s.removed} ${s.removed === 1 ? 'is' : 'are'} removed`);
-  return parts.join(', ');
+  if (s.changed) parts.push(`${s.changed} 个文件将被更改`);
+  if (s.restored) parts.push(`${s.restored} 个文件将被恢复`);
+  if (s.removed) parts.push(`${s.removed} 个文件将被删除`);
+  return parts.join('，');
 }

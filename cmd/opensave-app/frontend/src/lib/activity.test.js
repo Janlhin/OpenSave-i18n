@@ -35,8 +35,8 @@ describe('feedByDay', () => {
     const log = [entry(23, 9, 'info', 'a'), entry(24, 9, 'info', 'b'), entry(24, 15, 'info', 'c')];
     const g = feedByDay(log, now);
     expect(g.map((x) => [x.day, x.entries.map((e) => e.message)])).toEqual([
-      ['Today', ['c', 'b']],
-      ['Yesterday', ['a']]
+      ['今天', ['c', 'b']],
+      ['昨天', ['a']]
     ]);
   });
 });

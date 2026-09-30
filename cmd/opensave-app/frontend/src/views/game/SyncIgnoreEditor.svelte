@@ -82,11 +82,10 @@
 </script>
 
 <div class="section">
-  <h4>Files that shouldn't sync</h4>
+  <h4>不应同步的文件</h4>
   <p class="hint">
-    Some games keep device-specific settings in the same folder as the save, and copying
-    those to another machine can break the game there. List them here and they stay put:
-    never sent, never received, never deleted by a sync.
+    有些游戏把设备相关的设置和存档放在同一个文件夹里，复制到另一台机器可能导致游戏在那边出问题。
+    在这里列出它们，它们就会原地不动：不会被发送、不会被接收，也不会被同步删除。
   </p>
   <textarea
     class="box"
@@ -96,24 +95,23 @@
     bind:value
   ></textarea>
   <span class="hint">
-    One pattern per line, like a <code>.gitignore</code> — <code>Config.gs</code> by name,
-    <code>/Config.gs</code> only at the top, <code>*.log</code> by extension,
-    <code>logs/</code> for a whole folder, <code>!keep.log</code> for an exception. Case
-    doesn't matter. Set the same list on your other devices; each one applies its own.
+    每行一个模式，与 <code>.gitignore</code> 类似 — <code>Config.gs</code> 按名称匹配，
+    <code>/Config.gs</code> 只匹配顶层，<code>*.log</code> 按扩展名匹配，
+    <code>logs/</code> 匹配整个文件夹，<code>!keep.log</code> 表示例外。不区分大小写。
+    在其他设备上设置相同的列表；每台设备各自应用自己的规则。
   </span>
   <span class="hint">
-    <strong>Snapshots still capture these files</strong>, so a restore brings them back —
-    excluding something stops it travelling, it never stops it being backed up.
+    <strong>快照仍会包含这些文件</strong>，因此恢复时会一并找回 — 排除只是阻止它传输，绝不阻止它被备份。
   </span>
 
   <div class="picker-head">
     <button class="btn small" on:click={togglePicker}>
-      <Chevron open={showFiles} /> Pick from your save folder
+      <Chevron open={showFiles} /> 从存档文件夹中选取
     </button>
     {#if showFiles && saveFiles}
       <span class="hint picker-count">
-        {excludedCount} of {saveFiles.length} files excluded
-        {#if truncated}· first {saveFiles.length} shown{/if}
+        {saveFiles.length} 个文件中有 {excludedCount} 个被排除
+        {#if truncated}· 仅显示前 {saveFiles.length} 个{/if}
       </span>
     {/if}
   </div>
@@ -122,9 +120,9 @@
     {#if filesError}
       <p class="hint err">{filesError}</p>
     {:else if !saveFiles}
-      <p class="hint"><Spinner size={13} /> Reading the save folder…</p>
+      <p class="hint"><Spinner size={13} /> 正在读取存档文件夹…</p>
     {:else if saveFiles.length === 0}
-      <p class="hint">This game's folders are empty, so there is nothing to pick yet.</p>
+      <p class="hint">这个游戏的文件夹是空的，暂时没有可选取的内容。</p>
     {:else}
       <div class="picker">
         {#each saveFiles as f (f.location + '/' + f.path)}
@@ -133,17 +131,15 @@
             <span class="file-name">
               {#if f.location}<span class="file-loc">{f.location} ›</span>{/if}{f.path}
             </span>
-            <span class="verdict">{f.excluded ? "won't sync" : 'syncs'}</span>
+            <span class="verdict">{f.excluded ? '不同步' : '同步'}</span>
           </label>
         {/each}
       </div>
       <span class="hint">
-        Ticking a file writes the pattern for you, anchored so it can only ever mean that
-        one file. Unticking a file caught by a wildcard adds a <code>!</code> exception
-        rather than deleting the wildcard.
+        勾选文件时会自动为你写好对应模式，并按锚定方式书写，确保它只可能指代这一个文件。
+        取消勾选一个被通配符覆盖的文件时，会添加 <code>!</code> 例外，而不是删掉通配符。
         {#if severalFolders}
-          A pattern applies to <strong>every one of this game's folders</strong>, so a
-          name that appears in two of them is excluded in both.
+          模式对<strong>这个游戏的每一个文件夹</strong>都生效，因此出现在两个文件夹中的同名文件会在两处都被排除。
         {/if}
       </span>
     {/if}

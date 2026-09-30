@@ -18,11 +18,11 @@ export const fmtTime = (t) => (t ? new Date(t).toLocaleString() : '—');
 /** "1 game", "3 games". */
 export const plural = (n, word, many = word + 's') => `${n} ${n === 1 ? word : many}`;
 
-/** How long something was played: "45 min", "3 h", "14 h 20 min". */
+/** 游玩时长："45 分钟"、"3 小时"、"14 小时 20 分钟"。 */
 export function playLength(ms) {
   const minutes = Math.round((ms ?? 0) / 60000);
   const h = Math.floor(minutes / 60);
   const m = minutes % 60;
-  if (h === 0) return `${m} min`;
-  return m ? `${h} h ${m} min` : `${h} h`;
+  if (h === 0) return `${m} 分钟`;
+  return m ? `${h} 小时 ${m} 分钟` : `${h} 小时`;
 }

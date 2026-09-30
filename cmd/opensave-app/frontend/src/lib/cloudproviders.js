@@ -4,8 +4,8 @@ export const providers = [
   { id: 'google_drive', label: 'Google Drive', oauth: true, img: 'cloud/googledrive.png' },
   { id: 'onedrive', label: 'OneDrive', oauth: true, img: 'cloud/onedrive.png' },
   { id: 'dropbox', label: 'Dropbox', oauth: true, img: 'cloud/dropbox.png' },
-  { id: 'local', label: 'Local Folder', oauth: false, icon: 'folder' },
-  { id: 'webdav', label: 'WebDAV Server', oauth: false, icon: 'cloud' },
+  { id: 'local', label: '本地文件夹', oauth: false, icon: 'folder' },
+  { id: 'webdav', label: 'WebDAV 服务器', oauth: false, icon: 'cloud' },
   { id: 'webhook', label: 'HTTP Webhook', oauth: false, icon: 'webhook' }
 ];
 
@@ -36,11 +36,11 @@ export function providerStatus(id, connected, cfg) {
   if (!cfg) return '';
   if (id === connected) {
     const email = cfg.tokens?.userEmail;
-    return isEmail(email) ? email : 'Connected';
+    return isEmail(email) ? email : '已连接';
   }
-  if (isOAuth(id)) return 'Click to sign in';
-  if (id === cfg.provider && cfg.url) return 'Configured';
-  return 'Not configured';
+  if (isOAuth(id)) return '点击登录';
+  if (id === cfg.provider && cfg.url) return '已配置';
+  return '未配置';
 }
 
 /** Tracked games and games only in the cloud, one tile each, so the cloud

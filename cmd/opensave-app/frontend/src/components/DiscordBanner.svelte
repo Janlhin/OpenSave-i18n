@@ -16,10 +16,10 @@
     </svg>
   </span>
   <span class="text">
-    <span class="title">The OpenSave Discord is open</span>
-    <span class="sub">Get help, report a bug, or see what's coming before it ships.</span>
+    <span class="title">OpenSave Discord 已开放</span>
+    <span class="sub">获取帮助、报告问题，或抢先了解即将推出的新功能。</span>
   </span>
-  <span class="cta">Join <span class="arrow" aria-hidden="true">→</span></span>
+  <span class="cta">加入 <span class="arrow" aria-hidden="true">→</span></span>
 </button>
 
 <style>

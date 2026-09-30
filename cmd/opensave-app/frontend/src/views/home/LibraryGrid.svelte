@@ -146,13 +146,13 @@
     }
     bulkBusy = false;
     const done = games.length - failed.length;
-    if (failed.length) toast(`${verb} ${done} of ${games.length} — ${failed.join('; ')}`, 'error');
-    else toast(`${verb} ${done} ${done === 1 ? 'game' : 'games'}`, 'success');
+    if (failed.length) toast(`${verb}完成 ${done}/${games.length} — ${failed.join('；')}`, 'error');
+    else toast(`${verb}共 ${done} 个游戏`, 'success');
   }
-  const snapshotPicked = () => forEachPicked('Took a snapshot of', (g) => api.post(`/api/games/${g.id}/snapshot`, { comment: '' }));
-  const syncPicked = () => forEachPicked('Started syncing', (g) => api.post(`/api/games/${g.id}/sync`, {}));
+  const snapshotPicked = () => forEachPicked('已为所选游戏拍摄快照：', (g) => api.post(`/api/games/${g.id}/snapshot`, { comment: '' }));
+  const syncPicked = () => forEachPicked('已开始同步：', (g) => api.post(`/api/games/${g.id}/sync`, {}));
   const favouritePicked = () =>
-    forEachPicked('Added to Favourites:', (g) => api.post('/api/collections/favourites/games', { gameId: g.id, in: true }));
+    forEachPicked('已加入收藏：', (g) => api.post('/api/collections/favourites/games', { gameId: g.id, in: true }));
   // "All" is what is on screen: selecting games a filter is hiding, to then
   // untrack them, would act on things nobody was looking at.
   $: allSelected = shown.length > 0 && shown.every((r) => libSelected.has(r.game.id));
@@ -176,30 +176,30 @@
 />
 
 <div class="toolbar">
-  <h3>Library</h3>
-  <input class="search" type="search" data-find placeholder="Find a game…" bind:value={query} aria-label="Find a game" />
+  <h3>游戏库</h3>
+  <input class="search" type="search" data-find placeholder="查找游戏…" bind:value={query} aria-label="查找游戏" />
   <div class="spacer"></div>
   {#if selectMode}
-    <span class="select-count">{libSelected.size} selected</span>
+    <span class="select-count">已选 {libSelected.size} 个</span>
     <button class="btn small" on:click={toggleSelectAll}>
-      {allSelected ? 'Unselect all' : `Select all (${shown.length})`}
+      {allSelected ? '取消全选' : `全选（${shown.length}）`}
     </button>
-    <button class="btn small" disabled={libSelected.size === 0 || bulkBusy} on:click={snapshotPicked} title="Take a snapshot of each">
-      <Camera size={14} />Snapshot
+    <button class="btn small" disabled={libSelected.size === 0 || bulkBusy} on:click={snapshotPicked} title="为每个游戏拍摄快照">
+      <Camera size={14} />快照
     </button>
-    <button class="btn small" disabled={libSelected.size === 0 || bulkBusy} on:click={syncPicked} title="Sync each with your devices">
-      <RefreshCw size={14} />Sync
+    <button class="btn small" disabled={libSelected.size === 0 || bulkBusy} on:click={syncPicked} title="与你的设备逐个同步">
+      <RefreshCw size={14} />同步
     </button>
-    <button class="btn small" disabled={libSelected.size === 0 || bulkBusy} on:click={favouritePicked} title="Add each to Favourites">
-      <Star size={14} />Favourite
+    <button class="btn small" disabled={libSelected.size === 0 || bulkBusy} on:click={favouritePicked} title="逐个加入收藏">
+      <Star size={14} />收藏
     </button>
     <button class="btn small danger" disabled={libSelected.size === 0} on:click={untrackSelected}>
-      Untrack selected
+      停止跟踪所选
     </button>
-    <button class="btn small" on:click={stopSelecting}>Cancel</button>
+    <button class="btn small" on:click={stopSelecting}>取消</button>
   {:else}
     <label class="sort">
-      <span>Sort</span>
+      <span>排序</span>
       <select bind:value={$libraryView.sort}>
         {#each Object.entries(SORTS) as [id, s]}
           <option value={id}>{s.label}</option>
@@ -209,25 +209,25 @@
     <button
       class="btn small icon order"
       on:click={() => libraryView.update((v) => ({ ...v, reverse: !v.reverse }))}
-      title={$libraryView.reverse ? 'Reversed — put back in order' : 'Reverse the order'}
-      aria-label="Reverse the order"
+      title={$libraryView.reverse ? '已反转 — 恢复原顺序' : '反转顺序'}
+      aria-label="反转顺序"
       aria-pressed={$libraryView.reverse}
     >
       <svelte:component this={$libraryView.reverse ? ArrowUpNarrowWide : ArrowDownWideNarrow} size={15} />
     </button>
     <div class="view-anchor">
       <button class="btn small" class:active={viewOpen} aria-expanded={viewOpen} on:click={() => (viewOpen = !viewOpen)}>
-        <LayoutGrid size={14} />View
+        <LayoutGrid size={14} />视图
       </button>
       {#if viewOpen}
         <div class="view-backdrop" use:backdropClose={() => (viewOpen = false)} role="presentation"></div>
-        <div class="view-panel card" role="dialog" aria-label="Library view">
+        <div class="view-panel card" role="dialog" aria-label="库视图">
           <LibraryViewOptions />
-          <p class="view-hint">Also in Settings → General.</p>
+          <p class="view-hint">也可在设置 → 通用 中调整。</p>
         </div>
       {/if}
     </div>
-    <button class="btn small" on:click={toggleSelectMode}><SquareCheckBig size={14} />Select</button>
+    <button class="btn small" on:click={toggleSelectMode}><SquareCheckBig size={14} />选择</button>
   {/if}
 </div>
 
@@ -238,7 +238,7 @@
     {/if}
     {#if chips.length}
       {#if filters.length > 1}<span class="chip-sep" aria-hidden="true"></span>{/if}
-      <div class="collection-chips" role="group" aria-label="Collections">
+      <div class="collection-chips" role="group" aria-label="合集">
         {#each chips as c}
           <button class="collection-chip" class:active={$collectionFilter === c.id} aria-pressed={$collectionFilter === c.id} on:click={() => toggleCollection(c.id)}>
             {#if c.builtin}<Star size={12} />{/if}{c.label}<span class="count">{c.count}</span>
@@ -251,8 +251,8 @@
 
 {#if shown.length === 0}
   <div class="none">
-    <p>No games match{query.trim() ? ` "${query.trim()}"` : ''}.</p>
-    <button class="btn small" on:click={clearFilters}>Clear filters</button>
+    <p>没有匹配{query.trim() ? ` “${query.trim()}”` : ''}的游戏。</p>
+    <button class="btn small" on:click={clearFilters}>清除筛选</button>
   </div>
 {:else}
   <div class="grid" style="grid-template-columns: {gridColumns($libraryView)}" on:keydown={gridKeys} role="presentation">
@@ -270,7 +270,7 @@
     {/each}
   </div>
   {#if filtering}
-    <p class="showing">Showing {shown.length} of {rows.length}. <button class="linklike" on:click={clearFilters}>Show all</button></p>
+    <p class="showing">显示 {rows.length} 个中的 {shown.length} 个。<button class="linklike" on:click={clearFilters}>显示全部</button></p>
   {/if}
 {/if}
 

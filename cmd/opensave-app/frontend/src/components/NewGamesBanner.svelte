@@ -39,9 +39,9 @@
   }
 
   const list = (items, rest) => {
-    const all = rest > 0 ? [...items, `${rest} more`] : items;
+    const all = rest > 0 ? [...items, `等 ${rest} 个`] : items;
     if (all.length === 1) return all[0];
-    return all.slice(0, -1).join(', ') + ' and ' + all[all.length - 1];
+    return all.slice(0, -1).join('、') + ' 和 ' + all[all.length - 1];
   };
 </script>
 
@@ -51,18 +51,18 @@
     <div class="new-body">
       <div class="new-title">
         {#if names.length === 1}
-          <strong>{names[0]}</strong> has saves OpenSave isn't keeping yet
+          <strong>{names[0]}</strong> 有尚未被 OpenSave 保护的存档
         {:else}
-          <strong>{names.length} games</strong> have saves OpenSave isn't keeping yet
+          <strong>{names.length} 个游戏</strong>有尚未被 OpenSave 保护的存档
         {/if}
       </div>
       <div class="new-sub">
-        {#if names.length > 1}{list(shown, more)} · {/if}nothing is tracked until you choose it
+        {#if names.length > 1}{list(shown, more)} · {/if}在你选择之前不会跟踪任何内容
       </div>
     </div>
     <div class="new-actions">
-      <button class="btn small" disabled={busy} on:click={dismiss}>Dismiss</button>
-      <button class="btn small primary" disabled={busy} on:click={review}>Review</button>
+      <button class="btn small" disabled={busy} on:click={dismiss}>忽略</button>
+      <button class="btn small primary" disabled={busy} on:click={review}>查看</button>
     </div>
   </div>
 {/if}

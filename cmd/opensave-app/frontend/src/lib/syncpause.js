@@ -12,39 +12,39 @@ export const PAUSE_CHOICES = [
   { minutes: null, label: '直到我手动恢复' }
 ];
 
-/** "for 42 more minutes", "for 1 h 05 min", "until you resume". */
+/** "还有 42 分钟"，"还剩 1 小时 05 分钟"，"直到你手动恢复"。 */
 export function pauseLength(pause, now = Date.now()) {
   if (!pause?.paused) return '';
-  if (pause.untilRestart || !pause.endsAt) return 'until you resume';
+  if (pause.untilRestart || !pause.endsAt) return '直到你手动恢复';
   const minutes = Math.max(0, Math.ceil((pause.endsAt - now) / 60000));
   if (minutes >= 60) {
     const h = Math.floor(minutes / 60);
     const m = minutes % 60;
-    const hours = h === 1 ? '1 hour' : `${h} hours`;
-    return m ? `for ${hours} ${m === 1 ? '1 minute' : `${m} minutes`}` : `for ${hours}`;
+    const hours = `${h} 小时`;
+    return m ? `还剩 ${hours} ${m} 分钟` : `还剩 ${hours}`;
   }
-  if (minutes <= 1) return 'for less than a minute';
-  return `for ${minutes} more minutes`;
+  if (minutes <= 1) return '还剩不到 1 分钟';
+  return `还剩 ${minutes} 分钟`;
 }
 
 /** Short form for the status bar: "42 min left", "until resumed". */
 export function pauseShort(pause, now = Date.now()) {
   if (!pause?.paused) return '';
-  if (pause.untilRestart || !pause.endsAt) return 'until resumed';
+  if (pause.untilRestart || !pause.endsAt) return '直到恢复';
   const minutes = Math.max(0, Math.ceil((pause.endsAt - now) / 60000));
   if (minutes >= 60) {
     const h = Math.floor(minutes / 60);
     const m = minutes % 60;
-    return m ? `${h} h ${m} min left` : `${h} h left`;
+    return m ? `剩 ${h} 小时 ${m} 分钟` : `剩 ${h} 小时`;
   }
-  return `${Math.max(1, minutes)} min left`;
+  return `剩 ${Math.max(1, minutes)} 分钟`;
 }
 
 export async function pauseSync(minutes) {
   try {
     await api.post('/api/sync/pause', minutes ? { minutes } : { untilRestart: true });
     toast(
-      minutes ? `Syncing paused — snapshots are still taken` : 'Syncing paused until you resume — snapshots are still taken',
+      minutes ? `同步已暂停——快照仍会照常建立` : '同步已暂停，直到你手动恢复——快照仍会照常建立',
       'success'
     );
   } catch (e) {
@@ -55,7 +55,7 @@ export async function pauseSync(minutes) {
 export async function resumeSync() {
   try {
     await api.post('/api/sync/resume', {});
-    toast('Syncing resumed — catching up', 'success');
+    toast('同步已恢复——正在补上进度', 'success');
   } catch (e) {
     toast(e.message, 'error');
   }

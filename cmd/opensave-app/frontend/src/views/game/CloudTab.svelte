@@ -31,16 +31,16 @@
   load();
 
   const restore = async (snap) => {
-    if (!(await askConfirm(`Download and restore cloud snapshot ${snap.snapshotId} over your current save?`, { title: 'Restore from cloud?', confirmText: 'Download & restore' }))) return;
-    return run('Restored from cloud', async () => {
+    if (!(await askConfirm(`下载云端快照 ${snap.snapshotId} 并覆盖当前存档？`, { title: '从云端恢复？', confirmText: '下载并恢复' }))) return;
+    return run('已从云端恢复', async () => {
       await api.post(`/api/cloud/restore/${game.id}`, { fileName: snap.name });
     });
   };
 
   const upload = () =>
-    run('Uploaded to cloud', async () => {
+    run('已上传到云端', async () => {
       const res = await api.post(`/api/cloud/sync-local/${game.id}`);
-      toast(`Uploaded ${res.uploaded}, skipped ${res.skipped}`, 'success');
+      toast(`已上传 ${res.uploaded} 个，跳过 ${res.skipped} 个`, 'success');
       await load();
     });
 </script>
@@ -48,33 +48,33 @@
 <div class="card">
   <div class="head">
     <div>
-      <h3 class="with-icon"><Cloud size={18} /> Cloud snapshots for {game.name}</h3>
-      <p class="sub">Snapshots backed up to your configured cloud provider.</p>
+      <h3 class="with-icon"><Cloud size={18} /> {game.name} 的云端快照</h3>
+      <p class="sub">已备份到所配置云服务商的快照。</p>
     </div>
     <div class="actions">
-      <button class="btn small" disabled={$busy} on:click={load}><RefreshCw size={13} />Refresh</button>
-      <button class="btn small primary" disabled={$busy} on:click={upload}><Upload size={13} />Upload local snapshots</button>
+      <button class="btn small" disabled={$busy} on:click={load}><RefreshCw size={13} />刷新</button>
+      <button class="btn small primary" disabled={$busy} on:click={upload}><Upload size={13} />上传本地快照</button>
     </div>
   </div>
 
   {#if loading}
-    <div class="quiet-block"><Spinner size={13} /> Loading cloud snapshots…</div>
+    <div class="quiet-block"><Spinner size={13} /> 正在加载云端快照…</div>
   {:else if !snaps || snaps.length === 0}
     <div class="quiet-block">
-      <p>No cloud snapshots for this game yet.</p>
+      <p>这个游戏还没有云端快照。</p>
       {#if $settings?.cloudSync?.ready}
-        <p class="hint">New snapshots are copied up as they are taken. “Upload local snapshots” sends the ones from before.</p>
+        <p class="hint">新快照在创建时会自动上传。“上传本地快照”则发送在此之前创建的那些。</p>
       {:else}
         <p class="hint">
-          Set up a provider in <button class="linklike" on:click={() => navigate('cloud')}>Cloud Backup</button>,
-          then use “Upload local snapshots”.
+          先在<button class="linklike" on:click={() => navigate('cloud')}>云备份</button>中配置服务商，
+          再使用“上传本地快照”。
         </p>
       {/if}
     </div>
   {:else}
     <table>
       <thead>
-        <tr><th>Branch</th><th>Date</th><th>Size</th><th></th></tr>
+        <tr><th>分支</th><th>日期</th><th>大小</th><th></th></tr>
       </thead>
       <tbody>
         {#each snaps as snap (snap.name)}
@@ -83,7 +83,7 @@
             <td class="mono">{new Date(snap.createdTime).toLocaleString()}</td>
             <td class="mono">{fmtSize(snap.sizeBytes)}</td>
             <td class="right">
-              <button class="btn small primary" disabled={$busy} on:click={() => restore(snap)}>Restore</button>
+              <button class="btn small primary" disabled={$busy} on:click={() => restore(snap)}>恢复</button>
             </td>
           </tr>
         {/each}

@@ -60,7 +60,7 @@
       const results = (await api.get('/api/presets/scan')) ?? [];
       // A list, always. Anything else is not a scan, and reading one as a
       // list failed with "i is not iterable" — which says nothing.
-      if (!Array.isArray(results)) throw new Error("The scan's answer was not a list of saves. Restart OpenSave and scan again.");
+      if (!Array.isArray(results)) throw new Error('扫描结果不是存档列表。请重启 OpenSave 后再次扫描。');
       fillMissingAppIds(results);
       scanResults = results;
     } catch (e) {
@@ -89,7 +89,7 @@
     selected.delete(item.id);
     selected = selected;
     withUndo({
-      message: `"${item.name}" won't be offered in scans again.`,
+      message: `“${item.name}”以后不会再出现在扫描结果中。`,
       keys: [`scan:${item.savePath}`],
       stillThere: () => (scanResults ?? []).some((r) => r.id === item.id),
       run: async () => {
@@ -228,11 +228,11 @@
       const { failed } = await trackAsOneGame(primary, extras);
       consumeRows(new Set(group.suggested.map((m) => m.id)));
       if (failed.length > 0) {
-        toast(`Tracking "${primary.name}" — ${failed.length} folder(s) could not be added: ${failed[0]}`, 'error');
+        toast(`正在跟踪“${primary.name}” — 有 ${failed.length} 个文件夹无法添加：${failed[0]}`, 'error');
       } else if (extras.length > 0) {
-        toast(`Now tracking "${primary.name}" across ${extras.length + 1} folders`, 'success');
+        toast(`现在开始跟踪“${primary.name}”，共 ${extras.length + 1} 个文件夹`, 'success');
       } else {
-        toast(`Now tracking "${primary.name}"`, 'success');
+        toast(`现在开始跟踪“${primary.name}”`, 'success');
       }
     } catch (e) {
       toast(e.message, 'error');
@@ -263,8 +263,8 @@
 
     consumeRows(new Set(items.map((i) => i.id)));
     clearSelection();
-    const extra = locations > 0 ? ` with ${locations} extra location${locations === 1 ? '' : 's'}` : '';
-    toast(`Tracked ${games} game${games === 1 ? '' : 's'}${extra}`, problems.length > 0 ? 'error' : 'success');
+    const extra = locations > 0 ? `，另有 ${locations} 个额外位置` : '';
+    toast(`已跟踪 ${games} 个游戏${extra}`, problems.length > 0 ? 'error' : 'success');
     if (problems.length > 0) toast(problems[0], 'error');
     if (filteredResults.length === 0) close();
   }
@@ -284,41 +284,41 @@
       const { failed } = await trackAsOneGame(primary, extras);
       consumeRows(new Set(items.map((i) => i.id)));
       clearSelection();
-      if (failed.length > 0) toast(`Tracked "${primary.name}", but ${failed.length} folder(s) failed: ${failed[0]}`, 'error');
-      else toast(`Tracking "${primary.name}" across ${items.length} folders`, 'success');
+      if (failed.length > 0) toast(`已跟踪“${primary.name}”，但有 ${failed.length} 个文件夹失败：${failed[0]}`, 'error');
+      else toast(`正在跟踪“${primary.name}”，共 ${items.length} 个文件夹`, 'success');
       if (filteredResults.length === 0) close();
     } catch (e) {
       toast(e.message, 'error');
     }
   }
 
-  const typeLabels = { emulator: 'Emulator', repack: 'Repack', game: 'Game' };
+  const typeLabels = { emulator: '模拟器', repack: '复刻版', game: '游戏' };
   const typeIcon = (t) => (t === 'emulator' ? Joystick : t === 'repack' ? Package : Gamepad2);
-  const typeTabs = [['all', 'All'], ['game', 'Games'], ['emulator', 'Emulators'], ['repack', 'Repacks']];
+  const typeTabs = [['all', '全部'], ['game', '游戏'], ['emulator', '模拟器'], ['repack', '复刻版']];
 </script>
 
 <svelte:window on:keydown={onKeydown} />
 
 {#if open}
-  <Modal title="Scan results" icon={ScanSearch} onClose={close} width={920} height="min(82vh, 860px)">
+  <Modal title="扫描结果" icon={ScanSearch} onClose={close} width={920} height="min(82vh, 860px)">
     <svelte:fragment slot="sub">
-      {#if scanning}Scanning your system…{:else}Found {scanCounts.all} save location{scanCounts.all === 1 ? '' : 's'} — {availableGroups.length} available to track{#if emptyCount > 0 && !showEmpty}, {emptyCount} empty hidden{/if}{/if}
+      {#if scanning}正在扫描你的系统…{:else}找到 {scanCounts.all} 个存档位置 — 其中 {availableGroups.length} 个可跟踪{#if emptyCount > 0 && !showEmpty}，{emptyCount} 个空文件夹已隐藏{/if}{/if}
     </svelte:fragment>
 
     {#if scanning}
-      <ModalLoading>Scanning Steam, emulators, and configured folders…</ModalLoading>
+      <ModalLoading>正在扫描 Steam、模拟器和已配置的文件夹…</ModalLoading>
     {:else}
       <div class="toolbar">
-        <SearchInput placeholder="Filter by name or path…" bind:value={scanFilter} />
+        <SearchInput placeholder="按名称或路径筛选…" bind:value={scanFilter} />
         <FilterTabs options={typeTabs} counts={scanCounts} bind:value={scanType} />
-        <label class="toggle" title="Also show saves you already track">
+        <label class="toggle" title="同时显示你已在跟踪的存档">
           <input type="checkbox" bind:checked={showTracked} />
-          Show tracked
+          显示已跟踪
         </label>
         {#if emptyCount > 0}
-          <label class="toggle" title="Folders that exist but hold no files — Steam makes one for every game you own, whether or not saves go there. A game with nothing saved anywhere is in here too.">
+          <label class="toggle" title="存在但不含任何文件的文件夹 — Steam 会为你拥有的每个游戏都创建一个，无论存档是否会放进那里。从未在任何地方存过档的游戏也会出现在这里。">
             <input type="checkbox" bind:checked={showEmpty} />
-            Show {emptyCount} empty
+            显示 {emptyCount} 个空文件夹
           </label>
         {/if}
       </div>
@@ -330,7 +330,7 @@
             {@const tracked = isTracked(item)}
             {#if i === availableGroups.length && trackedGroups.length > 0}
               <div class="divider">
-                Already tracked ({trackedGroups.length})
+                已在跟踪（{trackedGroups.length}）
               </div>
             {/if}
             <!--
@@ -347,7 +347,7 @@
               icon={typeIcon(item.type)}
               selected={groupSelected(group, selected)}
               badge={typeLabels[item.type] ?? item.type}
-              stamp={tracked ? 'Tracked' : ''}
+              stamp={tracked ? '已跟踪' : ''}
               dimmed={tracked}
               faded={isEmptyResult(item)}
               meta={contentsLabel(item)}
@@ -356,15 +356,15 @@
             >
               <svelte:fragment slot="hover">
                 <button class="btn small primary" on:click|stopPropagation={() => trackGroup(group)}>
-                  {group.suggested.length > 1 ? `Track all ${group.suggested.length}` : 'Track'}
+                  {group.suggested.length > 1 ? `全部跟踪（${group.suggested.length} 个）` : '跟踪'}
                 </button>
                 <button
                   class="btn small"
                   disabled={excluding === item.id}
-                  title="Stop offering this location in future scans"
+                  title="以后的扫描不再提供此位置"
                   on:click|stopPropagation={() => excludeResult(item)}
                 >
-                  {excluding === item.id ? 'Excluding…' : 'Exclude'}
+                  {excluding === item.id ? '正在排除…' : '排除'}
                 </button>
               </svelte:fragment>
               {#if group.extras.length > 0}
@@ -373,8 +373,8 @@
                   class:open={expandedGroup === group.id}
                   on:click|stopPropagation={() => (expandedGroup = expandedGroup === group.id ? null : group.id)}
                 >
-                  <Chevron open={expandedGroup === group.id} size={12} /> found in {group.members.length} folders
-                  {#if group.suggested.length > 1}<span class="folders-hint">· {group.suggested.length} are one save</span>{/if}
+                  <Chevron open={expandedGroup === group.id} size={12} /> 位于 {group.members.length} 个文件夹中
+                  {#if group.suggested.length > 1}<span class="folders-hint">· 其中 {group.suggested.length} 个属于同一份存档</span>{/if}
                 </button>
               {/if}
             </CoverTile>
@@ -384,7 +384,7 @@
             {/if}
           {:else}
             <div class="empty-grid">
-              {scanCounts.all === 0 ? 'Nothing detected. You can still track any folder manually.' : 'No matches for this filter.'}
+              {scanCounts.all === 0 ? '未检测到任何内容。你仍可手动跟踪任意文件夹。' : '没有符合此筛选条件的结果。'}
             </div>
           {/each}
         </div>
@@ -392,9 +392,9 @@
 
       <ModalFoot>
         <div class="actions">
-          <button class="btn small" on:click={selectAllVisible} disabled={availableGroups.length === 0}>Select all ({availableGroups.length})</button>
+          <button class="btn small" on:click={selectAllVisible} disabled={availableGroups.length === 0}>全选（{availableGroups.length}）</button>
           {#if selectedCount > 0}
-            <button class="btn small" on:click={clearSelection}>Clear</button>
+            <button class="btn small" on:click={clearSelection}>清除</button>
           {/if}
         </div>
         <!-- Both tracking actions sit together on the right: they are the
@@ -404,14 +404,14 @@
           {#if selectedCount > 1}
             <button
               class="btn primary"
-              title="Track everything ticked as a single game, whatever it was grouped under. For a split save the scan did not spot."
+              title="把勾选的全部内容作为一个游戏来跟踪，无论它们被归到哪个组。适用于扫描未能识别出的被拆分的存档。"
               on:click={mergeSelectedIntoOneGame}
             >
-              Track as one game
+              作为一个游戏跟踪
             </button>
           {/if}
           <button class="btn primary" disabled={selectedCount === 0} on:click={trackSelected}>
-            Track selected ({selectedCount})
+            跟踪所选（{selectedCount}）
           </button>
         </div>
       </ModalFoot>

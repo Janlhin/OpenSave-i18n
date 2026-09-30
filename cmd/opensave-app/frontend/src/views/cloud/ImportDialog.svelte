@@ -32,13 +32,13 @@
     try {
       const res = await api.post('/api/backup/restore', { sourcePath: source, mode });
       if (res.legacy) {
-        toast(`Imported ${plural(res.imported, 'snapshot')}, skipped ${res.skipped}`, 'success');
+        toast(`已导入 ${res.imported} 个快照，跳过 ${res.skipped} 个`, 'success');
       } else {
         const bits = [];
-        if (res.restored) bits.push(`${res.restored} restored`);
-        if (res.snapshots) bits.push(`${res.snapshots} added to snapshots`);
-        if (res.skipped) bits.push(`${res.skipped} skipped`);
-        toast(`Import finished: ${bits.join(', ') || 'nothing imported'} — details in Activity`, res.skipped ? 'info' : 'success');
+        if (res.restored) bits.push(`${res.restored} 个已还原`);
+        if (res.snapshots) bits.push(`${res.snapshots} 个已加入快照`);
+        if (res.skipped) bits.push(`${res.skipped} 个已跳过`);
+        toast(`导入完成：${bits.join('，') || '未导入任何内容'}——详情见活动记录`, res.skipped ? 'info' : 'success');
       }
       close();
     } catch (e) {
@@ -51,30 +51,28 @@
 
 <!-- Two choices and a footer don't need the full browser-modal height —
      sized to content so the dialog doesn't look hollow. -->
-<Modal title="Import backup" icon={PackageOpen} onClose={close} closable={!importing} width={560} height="auto" maxHeight="min(78vh, 720px)">
+<Modal title="导入备份" icon={PackageOpen} onClose={close} closable={!importing} width={560} height="auto" maxHeight="min(78vh, 720px)">
   <svelte:fragment slot="sub"><code>{source}</code></svelte:fragment>
 
   <div class="modes">
     <label class="mode" class:selected={mode === 'snapshots'}>
       <input type="radio" bind:group={mode} value="snapshots" />
       <div>
-        <div class="mode-title">Add to snapshots <span class="badge online">recommended</span></div>
+        <div class="mode-title">加入快照 <span class="badge online">推荐</span></div>
         <p class="quiet">
-          Each save in the file is added to its game's snapshot history. Nothing on disk
-          changes — restore individual games whenever you choose. Games not tracked on this
-          machine are reported in Activity and skipped.
+          文件中的每个存档都会加入其游戏的快照历史。磁盘上的内容不做任何改动——你随时可以选择
+          逐个还原游戏。本机未跟踪的游戏会在活动记录中列出并跳过。
         </p>
       </div>
     </label>
     <label class="mode danger-mode" class:selected={mode === 'overwrite'}>
       <input type="radio" bind:group={mode} value="overwrite" />
       <div>
-        <div class="mode-title">Overwrite current saves</div>
+        <div class="mode-title">覆盖当前存档</div>
         <p class="quiet">
-          Every save in the file is written to its location on this machine — tracked games to
-          their tracked folder, others to the path recorded in the backup. A safety copy of
-          whatever is there now is taken first. Check Activity afterwards for exactly what was
-          restored where.
+          文件中的每个存档都会写入本机对应的位置——已跟踪的游戏写入其跟踪文件夹，其他游戏写入备份中
+          记录的路径。写入前会先对现有内容做一份安全副本。之后可在活动记录中查看具体还原了什么、
+          还原到了哪里。
         </p>
       </div>
     </label>
@@ -82,16 +80,16 @@
 
   {#if importing && prog}
     <ProgressBar done={prog.done} total={prog.total}>
-      Importing {Math.min(prog.done + 1, prog.total)} of {prog.total}
+      导入第 {Math.min(prog.done + 1, prog.total)} 个，共 {prog.total} 个
       {#if prog.current}&nbsp;— <code>{prog.current}</code>{/if}
     </ProgressBar>
   {/if}
   <ModalFoot>
-    <span class="quiet">Nothing is ever overwritten without a safety copy.</span>
+    <span class="quiet">任何覆盖操作都会先做安全副本，绝不会例外。</span>
     <div class="actions">
-      <button class="btn" disabled={importing} on:click={close}>Cancel</button>
+      <button class="btn" disabled={importing} on:click={close}>取消</button>
       <button class="btn {mode === 'overwrite' ? 'danger' : 'primary'}" disabled={importing} on:click={run}>
-        {importing ? 'Importing…' : mode === 'overwrite' ? 'Overwrite saves' : 'Add to snapshots'}
+        {importing ? '导入中…' : mode === 'overwrite' ? '覆盖存档' : '加入快照'}
       </button>
     </div>
   </ModalFoot>

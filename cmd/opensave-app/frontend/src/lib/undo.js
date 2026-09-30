@@ -62,7 +62,7 @@ export function withUndo({ message, keys = [], run, delay = UNDO_DELAY, notify =
     };
 
     const timer = setTimeout(() => finish(false), delay);
-    notify(message, 'info', { ttl: delay, action: { label: 'Undo', run: () => finish(true) } });
+    notify(message, 'info', { ttl: delay, action: { label: '撤销', run: () => finish(true) } });
   });
 }
 

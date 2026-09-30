@@ -23,7 +23,7 @@ describe('withUndo', () => {
 
     expect(get(hiddenKeys).has('g1')).toBe(true);
     expect(r.toasts[0]).toMatchObject({ message: 'Stopped tracking Hades', ttl: 1000 });
-    expect(r.toasts[0].action.label).toBe('Undo');
+    expect(r.toasts[0].action.label).toBe('撤销');
     expect(run).not.toHaveBeenCalled();
 
     await vi.advanceTimersByTimeAsync(1000);

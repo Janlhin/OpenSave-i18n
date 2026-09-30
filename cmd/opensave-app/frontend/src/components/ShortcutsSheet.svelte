@@ -9,7 +9,7 @@
   const show = (keys) => (isMac ? keys.replace('Ctrl', '⌘') : keys);
 </script>
 
-<Modal title="Keyboard shortcuts" icon={Keyboard} {onClose} width={520} height="auto">
+<Modal title="键盘快捷键" icon={Keyboard} {onClose} width={520} height="auto">
   <dl>
     {#each SHORTCUTS as [keys, what]}
       <dt>{#each show(keys).split(' ') as k}<kbd>{k}</kbd>{/each}</dt>

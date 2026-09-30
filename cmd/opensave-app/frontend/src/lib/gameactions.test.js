@@ -41,15 +41,15 @@ describe('gameMenuItems', () => {
 
   it('greys out restoring when there is no snapshot, and says when the latest is from', () => {
     const none = gameMenuItems(game({ branches: {} })).find((i) => i?.id === 'restore-latest');
-    expect(none).toMatchObject({ disabled: true, hint: 'none yet' });
+    expect(none).toMatchObject({ disabled: true, hint: '暂无' });
     const some = gameMenuItems(game(), { now: new Date('2026-09-22T12:00:00Z') }).find((i) => i?.id === 'restore-latest');
     expect(some.disabled).toBe(false);
     expect(some.hint).toBeTruthy();
   });
 
   it('offers to add to Favourites, or to remove when it is one', () => {
-    expect(gameMenuItems(game()).find((i) => i?.id === 'favourite').label).toBe('Add to Favourites');
-    expect(gameMenuItems(game(), { favourite: true }).find((i) => i?.id === 'favourite').label).toBe('Remove from Favourites');
+    expect(gameMenuItems(game()).find((i) => i?.id === 'favourite').label).toBe('加入收藏');
+    expect(gameMenuItems(game(), { favourite: true }).find((i) => i?.id === 'favourite').label).toBe('从收藏中移除');
   });
 
   it('puts the destructive action last, apart and marked', () => {

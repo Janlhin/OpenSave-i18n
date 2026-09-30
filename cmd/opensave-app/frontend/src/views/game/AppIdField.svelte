@@ -56,31 +56,28 @@
 
 <div class="field">
   <label for="c-appid">Steam App ID</label>
-  <input id="c-appid" placeholder="e.g. 1091500" bind:value />
+  <input id="c-appid" placeholder="例如 1091500" bind:value />
   <span class="hint">
-    The number in the game's Steam store URL. Used to launch it and fetch its cover art.
+    即游戏 Steam 商店网址中的那串数字。用于启动游戏和获取封面图。
     <MoreInfo>
-      With “Match games by Steam App ID” turned on in Settings, it also lets this game sync
-      with a copy tracked under a different name on another device. Filled in automatically
-      when it can be worked out; a save under <code>AppData</code> often has nothing to work
-      it out from, so you can set it here.
+      在设置中开启“按 Steam App ID 匹配游戏”后，它还能让本游戏与另一台设备上以不同名称跟踪的副本同步。
+      能推断出来时会自动填写；位于 <code>AppData</code> 下的存档通常无从推断，此时你可以在这里手动填写。
     </MoreInfo>
   </span>
   {#if error}<span class="hint hint-error">{error}</span>{/if}
   {#if check?.state === 'checking'}
-    <span class="hint appid-check">Checking with Steam…</span>
+    <span class="hint appid-check">正在向 Steam 查询…</span>
   {:else if check?.state === 'found'}
     <span class="hint appid-check ok"><CircleCheck size={13} class="inline-icon" />Steam: <strong>{check.name}</strong></span>
   {:else if check?.state === 'unknown'}
     <span class="hint appid-check warn">
-      No Steam game has this App ID. It's the number in the store page address —
-      <code>store.steampowered.com/app/<strong>1091500</strong>/…</code> — not the one
-      from another store.
+      没有 Steam 游戏使用这个 App ID。它是商店页网址中的数字 —
+      <code>store.steampowered.com/app/<strong>1091500</strong>/…</code> — 而不是其他平台的编号。
     </span>
   {:else if check?.state === 'unreachable'}
     <span class="hint appid-check warn">
-      Couldn't reach Steam to check this number. If Steam's store or CDN is blocked on
-      this network, cover art won't load here either — the ID itself may well be right.
+      无法连接 Steam 来核对这个数字。如果当前网络无法访问 Steam 商店或 CDN，封面图也加载不出来 —
+      但这个 ID 本身很可能是对的。
     </span>
   {/if}
 </div>

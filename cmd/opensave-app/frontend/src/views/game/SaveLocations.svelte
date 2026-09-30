@@ -29,9 +29,9 @@
   async function pick(name) {
     const label = String(name ?? '').trim();
     if (!label || $busy) return;
-    const dir = await native.selectDirectory(`Folder for “${label}” — ${game.name}`);
+    const dir = await native.selectDirectory(`“${label}”的文件夹 — ${game.name}`);
     if (!dir) return;
-    await run(`“${label}” now covered`, async () => {
+    await run(`已覆盖“${label}”`, async () => {
       await api.post(`/api/games/${game.id}/roots`, { name: label, path: dir });
       newLocation = '';
       await load();
@@ -43,7 +43,7 @@
   const keyOf = (name) => `root:${game.id}:${name}`;
   function remove(name) {
     withUndo({
-      message: `The “${name}” folder is no longer covered. Its files are left where they are.`,
+      message: `“${name}”文件夹不再被覆盖同步。其文件仍保留在原处。`,
       keys: [keyOf(name)],
       stillThere: () => locations.some((l) => l.name === name),
       run: async () => {
@@ -56,14 +56,13 @@
 </script>
 
 <div class="section">
-  <h4>Save locations</h4>
+  <h4>存档位置</h4>
   <p class="hint">
-    Some games keep their save split across more than one folder — the save data in one
-    place, settings or mods in another. Add each extra folder here and it is synced,
-    snapshotted and restored along with the main one.
+    有些游戏的存档分散在多个文件夹里 — 存档数据在一处，设置或 Mod 在另一处。
+    在这里添加每个额外的文件夹，它就会与主文件夹一起被同步、快照和恢复。
   </p>
   <div class="row">
-    <span class="name">main save</span>
+    <span class="name">主存档</span>
     <span class="path" title={game.savePath}>{game.savePath}</span>
   </div>
   {#each shownLocations as loc (loc.name)}
@@ -73,27 +72,26 @@
         <span class="path" title={loc.path}>{loc.path}</span>
       {:else}
         <span class="path missing">
-          no folder on this device — this location isn't being synced
+          此设备上没有对应文件夹 — 该位置未被同步
         </span>
       {/if}
       <button class="btn small" disabled={$busy} on:click={() => pick(loc.name)}>
-        {loc.mapped ? 'Change' : 'Choose folder'}
+        {loc.mapped ? '更改' : '选择文件夹'}
       </button>
       <button class="btn small danger" disabled={$busy} on:click={() => remove(loc.name)}>
-        Remove
+        移除
       </button>
     </div>
   {/each}
   <div class="add">
-    <input placeholder="Name for the folder (e.g. config)" bind:value={newLocation} />
+    <input placeholder="文件夹的名称（如 config）" bind:value={newLocation} />
     <button class="btn" disabled={!newLocation || $busy} on:click={() => pick(newLocation)}>
-      + Add a folder
+      + 添加文件夹
     </button>
   </div>
   <span class="hint">
-    Give the same <strong>name</strong> on your other devices — that is what the two
-    sides match on, since the folder lives somewhere different on each machine. Removing
-    a location here never deletes its files.
+    在其他设备上使用相同的<strong>名称</strong> — 两边靠名称匹配，因为文件夹在每台机器上的位置各不相同。
+    在这里移除位置永远不会删除其中的文件。
   </span>
 </div>
 

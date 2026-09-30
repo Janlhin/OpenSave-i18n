@@ -10,7 +10,7 @@
   $: handheld = isHandheld(type);
 </script>
 
-<span class="device-icon" title={handheld ? 'Handheld' : 'Computer'}>
+<span class="device-icon" title={handheld ? '掌机' : '电脑'}>
   <svelte:component this={handheld ? Gamepad2 : Monitor} size={19} />
 </span>
 

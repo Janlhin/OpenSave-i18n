@@ -11,15 +11,15 @@ export function speedLabel(bytesPerSec) {
 
 /** "400 KB of 1.0 MB", "1.0 MB", or '' when nothing is known. */
 export function amountLabel(t) {
-  if (t.totalBytes > 0 && t.state === 'running') return `${fmtSize(t.bytesTransferred ?? 0)} of ${fmtSize(t.totalBytes)}`;
+  if (t.totalBytes > 0 && t.state === 'running') return `${fmtSize(t.bytesTransferred ?? 0)}（共 ${fmtSize(t.totalBytes)}）`;
   if (t.totalBytes > 0) return fmtSize(t.totalBytes);
   if (t.bytesTransferred > 0) return fmtSize(t.bytesTransferred);
   return '';
 }
 
-/** "from Deck" for a download, "to Deck" for an upload. */
+/** "来自 Deck" for a download, "发往 Deck" for an upload. */
 export function peerLabel(t) {
-  return t.direction === 'upload' ? `to ${t.peer || 'another device'}` : `from ${t.peer || 'another device'}`;
+  return t.direction === 'upload' ? `发往 ${t.peer || '另一台设备'}` : `来自 ${t.peer || '另一台设备'}`;
 }
 
 /** The transfers as the panel lists them, with each game's name. */

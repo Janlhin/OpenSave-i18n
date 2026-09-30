@@ -17,8 +17,8 @@ describe('notifications', () => {
       update: { latest: '2.5.0', current: '2.4.0' }
     });
     expect(w.map((x) => x.id.split(':')[0])).toEqual(['conflict', 'emptied', 'pair', 'missing', 'damaged', 'new', 'update']);
-    expect(w[0]).toMatchObject({ title: 'Hades needs a decision', go: { view: 'game', params: { gameId: 'hades' } } });
-    expect(w.find((x) => x.id.startsWith('damaged')).title).toBe("1 snapshot of Hades can't be restored");
+    expect(w[0]).toMatchObject({ title: 'Hades 需要做出决定', go: { view: 'game', params: { gameId: 'hades' } } });
+    expect(w.find((x) => x.id.startsWith('damaged')).title).toBe('Hades 有 1 个快照无法恢复');
   });
 
   it('turns activity into events, unread since the bell was last opened', () => {
@@ -31,7 +31,7 @@ describe('notifications', () => {
       { kind: 'received', gameId: 'hades', device: 'Deck', files: 1, atMs: now - 30 * 86_400_000 }
     ];
     const ev = happened(items, games, now - 600_000, now);
-    expect(ev.map((e) => e.title)).toEqual(['Hades: got 2 files from Steam Deck', "Celeste: brought Laptop's newer save from the cloud"]);
+    expect(ev.map((e) => e.title)).toEqual(['Hades: 从 Steam Deck 收到 2 个文件', 'Celeste: 从云端取来了 Laptop 的较新存档']);
     expect(ev.map((e) => e.unread)).toEqual([true, false]);
     expect(badgeCount([{}, {}], ev)).toBe(3);
   });
@@ -50,9 +50,9 @@ describe('a save arriving', () => {
     const shown = {};
     const t0 = 1_000_000;
     const ev = { kind: 'received', gameId: 'hades', device: 'Steam Deck', files: 2 };
-    expect(arrivalMessage(ev, games, shown, t0)).toBe('Hades: got 2 files from Steam Deck');
+    expect(arrivalMessage(ev, games, shown, t0)).toBe('Hades: 从 Steam Deck 收到 2 个文件');
     expect(arrivalMessage(ev, games, shown, t0 + 60_000)).toBeNull();
-    expect(arrivalMessage({ ...ev, gameId: 'celeste' }, games, shown, t0 + 60_000)).toBe('Celeste: got 2 files from Steam Deck');
+    expect(arrivalMessage({ ...ev, gameId: 'celeste' }, games, shown, t0 + 60_000)).toBe('Celeste: 从 Steam Deck 收到 2 个文件');
     expect(arrivalMessage(ev, games, shown, t0 + ARRIVAL_QUIET_MS + 1)).not.toBeNull();
     expect(arrivalMessage({ ...ev, kind: 'sent' }, games, {}, t0)).toBeNull();
   });

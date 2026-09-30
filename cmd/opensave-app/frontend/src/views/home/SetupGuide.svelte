@@ -28,18 +28,18 @@
   const copy = {
     saves: {
       icon: ScanSearch,
-      title: 'Find your game saves',
-      text: 'OpenSave looks through Steam, emulators and the usual save folders, and you choose what to keep.'
+      title: '找到你的游戏存档',
+      text: 'OpenSave 会检查 Steam、模拟器和常见的存档文件夹，由你来决定要保留哪些。'
     },
     devices: {
       icon: MonitorSmartphone,
-      title: 'Add your other devices',
-      text: 'A PC, a Steam Deck or a handheld with OpenSave on it — on your Wi-Fi, or anywhere over the internet.'
+      title: '添加你的其他设备',
+      text: '装有 OpenSave 的电脑、Steam Deck 或掌机 — 在你的 Wi-Fi 里，或通过互联网在任何地方。'
     },
     cloud: {
       icon: Cloud,
-      title: 'Back up to the cloud',
-      text: 'A copy of every snapshot in Google Drive, OneDrive, Dropbox or a folder of your own.'
+      title: '备份到云端',
+      text: '每份快照在 Google Drive、OneDrive、Dropbox 或你自己的文件夹中都有一份副本。'
     }
   };
 </script>
@@ -47,10 +47,10 @@
 <div class="card guide">
   <div class="top">
     <div>
-      <h3>Get OpenSave set up</h3>
-      <p class="progress">{plan.settled} of 3 done</p>
+      <h3>完成 OpenSave 初始设置</h3>
+      <p class="progress">已完成 {plan.settled} / 3</p>
     </div>
-    <button class="btn small ghost" on:click={later} title="Hide this guide"><X size={14} />Later</button>
+    <button class="btn small ghost" on:click={later} title="隐藏本向导"><X size={14} />稍后</button>
   </div>
   <ol>
     {#each plan.steps as step, i}
@@ -60,21 +60,21 @@
           {#if step.done}<Check size={14} strokeWidth={3} />{:else}{i + 1}{/if}
         </span>
         <div class="body">
-          <div class="title">{c.title}{#if step.skipped}<span class="tag">Skipped</span>{/if}</div>
+          <div class="title">{c.title}{#if step.skipped}<span class="tag">已跳过</span>{/if}</div>
           {#if plan.next === step.id}
             <p class="text">{c.text}</p>
             <div class="actions">
               {#if step.id === 'saves'}
                 <button class="btn small primary" disabled={scanning} on:click={() => dispatch('scan')}>
-                  <ScanSearch size={14} />{scanning ? 'Scanning…' : 'Scan for saves'}
+                  <ScanSearch size={14} />{scanning ? '正在扫描…' : '扫描存档'}
                 </button>
-                <button class="btn small" on:click={() => dispatch('add')}><FolderPlus size={14} />Pick a folder</button>
+                <button class="btn small" on:click={() => dispatch('add')}><FolderPlus size={14} />选择文件夹</button>
               {:else if step.id === 'devices'}
-                <button class="btn small primary" on:click={() => navigate('devices')}><MonitorSmartphone size={14} />Pair a device</button>
-                <button class="btn small ghost" on:click={() => skip('devices')}>Only this device for now</button>
+                <button class="btn small primary" on:click={() => navigate('devices')}><MonitorSmartphone size={14} />配对设备</button>
+                <button class="btn small ghost" on:click={() => skip('devices')}>暂只使用这台设备</button>
               {:else}
-                <button class="btn small primary" on:click={() => navigate('cloud')}><Cloud size={14} />Choose where</button>
-                <button class="btn small ghost" on:click={() => skip('cloud')}>No cloud backup</button>
+                <button class="btn small primary" on:click={() => navigate('cloud')}><Cloud size={14} />选择位置</button>
+                <button class="btn small ghost" on:click={() => skip('cloud')}>不用云备份</button>
               {/if}
             </div>
           {/if}

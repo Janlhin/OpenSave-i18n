@@ -72,7 +72,7 @@
       {/each}
     </section>
   {:else}
-    <p class="empty">No release notes available.</p>
+    <p class="empty">暂无更新说明。</p>
   {/each}
 </div>
 

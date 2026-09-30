@@ -43,9 +43,9 @@ export async function initApi() {
     return baseURL;
   }
   throw new Error(
-    `The window can't reach OpenSave's background service at ${baseURL} (${lastErr?.message ?? 'no response'}). ` +
-      `This is usually another program blocking local connections (firewall/antivirus), or a leftover OpenSave still running — ` +
-      `check the system tray and Task Manager, then hit Retry.`
+    `窗口无法连接到 OpenSave 的后台服务 ${baseURL}（${lastErr?.message ?? '无响应'}）。` +
+      `这通常是其他程序阻止了本地连接（防火墙/杀毒软件），或有一个残留的 OpenSave 仍在运行——` +
+      `请检查系统托盘和任务管理器，然后点击重试。`
   );
 }
 
@@ -69,16 +69,16 @@ async function request(method, path, body) {
     }
   }
   if (!res.ok) {
-    throw new Error(data.error || `${method} ${path} failed (${res.status})`);
+    throw new Error(data.error || `${method} ${path} 请求失败（${res.status}）`);
   }
   return data;
 }
 
 function notOpenSave() {
   const e = new Error(
-    `Something other than OpenSave is answering at ${baseURL}. Another program is using OpenSave's port — ` +
-      `often a hardware or vendor utility installed alongside a driver or BIOS update. Your games and saves are not affected. ` +
-      `Restart OpenSave to have it pick another port.`
+    `在 ${baseURL} 应答的不是 OpenSave。另一个程序占用了 OpenSave 的端口——` +
+      `通常是随驱动或 BIOS 更新安装的硬件/厂商工具。你的游戏和存档不受影响。` +
+      `重启 OpenSave 即可让它换一个端口。`
   );
   e.notOpenSave = true;
   return e;
@@ -184,8 +184,8 @@ export const native = {
   changelogReleases: () => app()?.ChangelogReleases?.() ?? Promise.resolve([]),
   whatsNew: () => app()?.WhatsNew?.() ?? Promise.resolve([]),
   updateGreeting: () => app()?.UpdateGreeting?.() ?? Promise.resolve({}),
-  installFromPeer: (peerId) => app()?.InstallUpdateFromPeer?.(peerId) ?? Promise.resolve('not available in browser preview'),
-  installFromUrl: (url) => app()?.InstallUpdateFromURL?.(url) ?? Promise.resolve('not available in browser preview'),
+  installFromPeer: (peerId) => app()?.InstallUpdateFromPeer?.(peerId) ?? Promise.resolve('浏览器预览中不可用'),
+  installFromUrl: (url) => app()?.InstallUpdateFromURL?.(url) ?? Promise.resolve('浏览器预览中不可用'),
   selectDirectory: (title) => app()?.SelectDirectory(title ?? '') ?? Promise.resolve(''),
   // Reveals a folder in the system file manager. Resolves to '' on success,
   // or a message explaining why it couldn't be opened.
@@ -200,7 +200,7 @@ export const native = {
   showWindow: () => app()?.ShowWindow(),
   // A notification on the desktop (cmd/opensave-app/notify.go). Resolves to
   // '' once shown, or why it could not be.
-  desktopNotify: (note) => app()?.DesktopNotify?.(note) ?? Promise.resolve('not available in browser preview'),
+  desktopNotify: (note) => app()?.DesktopNotify?.(note) ?? Promise.resolve('浏览器预览中不可用'),
   // Whether a full-screen game or presentation is running (Windows asks the
   // OS; elsewhere, and in a browser, never).
   userBusy: () => app()?.UserBusy?.() ?? Promise.resolve(false),

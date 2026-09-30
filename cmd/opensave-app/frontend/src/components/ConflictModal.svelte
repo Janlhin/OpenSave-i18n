@@ -58,7 +58,7 @@
   }
   $: gameName = current ? ($games[current[0]]?.name ?? current[0]) : '';
   $: conflict = current ? current[1] : null;
-  $: peerName = conflict ? (conflict.peer.Name ?? conflict.peer.name ?? 'the other device') : '';
+  $: peerName = conflict ? (conflict.peer.Name ?? conflict.peer.name ?? '对方设备') : '';
   $: peerType = conflict ? $peers[conflict.peer.ID ?? conflict.peer.id]?.deviceType : '';
   $: localIcon = isHandheld($settings?.deviceType) ? Gamepad2 : Monitor;
   $: peerIcon = isHandheld(peerType) ? Gamepad2 : Monitor;
@@ -71,9 +71,9 @@
     const fresh = list.filter(([gid]) => !seen.has(gid));
     if (fresh.length > 0) {
       const game = $games[fresh[0][0]];
-      const name = game?.name ?? 'a game';
-      demandAttention('conflicts', { title: name, body: 'Its save changed here and on another device at once — choose which to keep.', game });
-      toast(`Save conflict for “${name}” — choose which version to keep`, 'error');
+      const name = game?.name ?? '某个游戏';
+      demandAttention('conflicts', { title: name, body: '本机和其他设备同时更改了这个存档——请选择要保留的版本。', game });
+      toast(`“${name}”出现存档冲突——请选择要保留的版本`, 'error');
     }
     seen = new Set(list.map(([gid]) => gid));
     // Housekeeping: forget "applying" markers for conflicts that no longer
@@ -129,9 +129,9 @@
   // different measurements.
   function sideSummary(stats) {
     const files = stats?.files;
-    if (files === 0) return 'save folder is empty';
+    if (files === 0) return '存档文件夹为空';
     if (typeof files !== 'number') return '';
-    return `whole save: ${files} file${files === 1 ? '' : 's'} · ${fmtSize(stats?.totalBytes ?? -1)}`;
+    return `整个存档：${files} 个文件 · ${fmtSize(stats?.totalBytes ?? -1)}`;
   }
 
   async function resolve(resolution) {
@@ -149,7 +149,7 @@
       });
       applying = new Set(applying).add(gameId);
       if (resolution !== 'keep-local') {
-        toast(`Applying your choice for “${name}” — transferring ${peerName}'s files…`, 'info');
+        toast(`正在为“${name}”应用你的选择——正在传输 ${peerName} 的文件…`, 'info');
       }
       showDiff = false;
     } catch (e) {
@@ -160,12 +160,12 @@
   }
 
   const fmtTime = (t) => (t ? new Date(t).toLocaleString() : '—');
-  const fmtMs = (ms) => (ms ? new Date(ms).toLocaleString() : 'unknown');
+  const fmtMs = (ms) => (ms ? new Date(ms).toLocaleString() : '未知');
   const fmtSize = (n) =>
     n < 0 ? '—' : n >= 1048576 ? (n / 1048576).toFixed(1) + ' MB' : n >= 1024 ? (n / 1024).toFixed(1) + ' KB' : n + ' B';
   const diffIcon = (s) => (s === 'changed' ? '✱' : s === 'only-remote' ? '+' : '−');
   const diffLabel = (s) =>
-    s === 'changed' ? 'differs' : s === 'only-remote' ? `only on ${peerName}` : 'only on this device';
+    s === 'changed' ? '有差异' : s === 'only-remote' ? `仅存在于 ${peerName}` : '仅存在于本机';
 </script>
 
 <svelte:window on:keydown={onKey} />
@@ -173,59 +173,53 @@
 {#if current && conflict}
   <div class="overlay" out:dialogOut|global>
     <div class="modal card">
-      <h3 class="with-icon"><GitCompareArrows size={20} /> Save conflict — {gameName}</h3>
+      <h3 class="with-icon"><GitCompareArrows size={20} /> 存档冲突 — {gameName}</h3>
       <p class="desc">
-        Both this device and <strong>{peerName}</strong> changed this save since the last sync.
-        Pick which version to play from.
+        上次同步后，本机与 <strong>{peerName}</strong> 都更改了这个存档。
+        请选择要从哪个版本继续游玩。
       </p>
 
       <div class="versions">
         <div class="version" class:newer={newerSide === 'local'}>
           <div class="v-head">
-            <span class="v-title with-icon"><svelte:component this={localIcon} size={16} /> This device</span>
-            {#if newerSide === 'local'}<span class="v-badge">played more recently</span>{/if}
+            <span class="v-title with-icon"><svelte:component this={localIcon} size={16} /> 本机</span>
+            {#if newerSide === 'local'}<span class="v-badge">最近游玩过</span>{/if}
           </div>
           <div class="v-diff">
-            <strong>{changedCount + onlyLocalCount}</strong>
-            file{changedCount + onlyLocalCount === 1 ? '' : 's'} differ{changedCount + onlyLocalCount === 1
-              ? 's'
-              : ''} here
+            此处有 <strong>{changedCount + onlyLocalCount}</strong> 个文件存在差异
             {#if localDiffBytes > 0}<span class="v-diff-bytes">· {fmtSize(localDiffBytes)}</span>{/if}
           </div>
           {#if onlyLocalCount > 0}
-            <div class="v-only">{onlyLocalCount} only on this device</div>
+            <div class="v-only">{onlyLocalCount} 个文件仅存在于本机</div>
           {/if}
           <div class="v-stats">{sideSummary(conflict.localStats)}</div>
-          <div class="v-time">last change {fmtMs(localMs)}</div>
+          <div class="v-time">最后更改 {fmtMs(localMs)}</div>
         </div>
         <div class="version" class:newer={newerSide === 'remote'}>
           <div class="v-head">
             <span class="v-title with-icon"><svelte:component this={peerIcon} size={16} /> {peerName}</span>
-            {#if newerSide === 'remote'}<span class="v-badge">played more recently</span>{/if}
+            {#if newerSide === 'remote'}<span class="v-badge">最近游玩过</span>{/if}
           </div>
           <div class="v-diff">
-            <strong>{changedCount + onlyRemoteCount}</strong>
-            file{changedCount + onlyRemoteCount === 1 ? '' : 's'} differ{changedCount + onlyRemoteCount === 1
-              ? 's'
-              : ''} there
+            对方有 <strong>{changedCount + onlyRemoteCount}</strong> 个文件存在差异
             {#if remoteDiffBytes > 0}<span class="v-diff-bytes">· {fmtSize(remoteDiffBytes)}</span>{/if}
           </div>
           {#if onlyRemoteCount > 0}
-            <div class="v-only">{onlyRemoteCount} only on {peerName}</div>
+            <div class="v-only">{onlyRemoteCount} 个文件仅存在于 {peerName}</div>
           {/if}
           <div class="v-stats">{sideSummary(conflict.remoteStats)}</div>
-          <div class="v-time">last change {fmtMs(remoteMs)}</div>
+          <div class="v-time">最后更改 {fmtMs(remoteMs)}</div>
         </div>
       </div>
       {#if diffCapped}
         <p class="diff-capped">
-          Counts above cover the first {diffFiles.length} of {diffTotal} differing files.
+          以上计数仅涵盖 {diffTotal} 个差异文件中的前 {diffFiles.length} 个。
         </p>
       {/if}
 
       {#if conflict.diffTotal > 0}
         <button class="diff-toggle" on:click={() => (showDiff = !showDiff)}>
-          <Chevron open={showDiff} /> What's different ({conflict.diffTotal} file{conflict.diffTotal === 1 ? '' : 's'})
+          <Chevron open={showDiff} /> 差异详情（{conflict.diffTotal} 个文件）
         </button>
         {#if showDiff}
           <div class="diff-list">
@@ -241,27 +235,26 @@
               </div>
             {/each}
             {#if conflict.diffTotal > conflict.diffFiles.length}
-              <div class="diff-more">…and {conflict.diffTotal - conflict.diffFiles.length} more</div>
+              <div class="diff-more">…还有 {conflict.diffTotal - conflict.diffFiles.length} 个</div>
             {/if}
           </div>
         {/if}
       {/if}
 
       <div class="actions">
-        <button class="btn ghost later" disabled={busy} on:click={putOff} title="Nothing of this game syncs until you decide. Open the game to decide.">Decide later</button>
-        <button class="btn" disabled={busy} on:click={() => resolve('keep-local')}>Keep mine</button>
-        <button class="btn" disabled={busy} on:click={() => resolve('keep-remote')}>Keep theirs</button>
+        <button class="btn ghost later" disabled={busy} on:click={putOff} title="在你决定之前，该游戏的任何内容都不会同步。打开该游戏页面进行决定。">稍后决定</button>
+        <button class="btn" disabled={busy} on:click={() => resolve('keep-local')}>保留我的</button>
+        <button class="btn" disabled={busy} on:click={() => resolve('keep-remote')}>保留对方的</button>
         <button class="btn primary" disabled={busy} on:click={() => resolve('merge-branch')}>
-          Keep both (recommended)
+          两者都保留（推荐）
         </button>
       </div>
       <p class="hint-line">
-        <History size={15} class="inline-icon" /> Nothing is lost whichever you pick. <strong>“Keep both”</strong> (recommended) keeps
-        playing yours — {peerName} receives it too — and keeps {peerName}'s version here on a branch you can switch
-        to. <strong>“Keep mine”</strong> makes your
-        version the shared one — {peerName} receives it (their old save is snapshotted first).
-        <strong>“Keep theirs”</strong> adopts {peerName}'s version here, snapshotting yours first.
-        Restore anything from the game's Snapshots / Branches tabs.
+        <History size={15} class="inline-icon" /> 无论选择哪一项都不会丢失数据。<strong>“两者都保留”</strong>（推荐）会继续
+        使用你的版本——{peerName} 也会收到它——并把 {peerName} 的版本保存在一个分支上，可随时切换过去。<strong>“保留我的”</strong>会把你的
+        版本设为共享版本——{peerName} 会收到它（对方的旧存档会先保存为快照）。
+        <strong>“保留对方的”</strong>会在这里采用 {peerName} 的版本，并先把你的存档保存为快照。
+        可随时在游戏的“快照 / 分支”标签页恢复任何内容。
       </p>
     </div>
   </div>

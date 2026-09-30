@@ -102,23 +102,23 @@ export function fmtBytes(n) {
  * still in use", and a date is something you have to do arithmetic on.
  */
 export function fmtAge(unix, now = Date.now()) {
-  if (!unix) return 'never';
+  if (!unix) return '从未';
   const secs = now / 1000 - unix;
-  if (secs < 60) return 'just now';
-  if (secs < 3600) return `${Math.floor(secs / 60)}m ago`;
-  if (secs < 86400) return `${Math.floor(secs / 3600)}h ago`;
-  if (secs < 86400 * 365) return `${Math.floor(secs / 86400)}d ago`;
+  if (secs < 60) return '刚刚';
+  if (secs < 3600) return `${Math.floor(secs / 60)} 分钟前`;
+  if (secs < 86400) return `${Math.floor(secs / 3600)} 小时前`;
+  if (secs < 86400 * 365) return `${Math.floor(secs / 86400)} 天前`;
   const years = secs / 86400 / 365;
-  return years < 2 ? 'over a year ago' : `${Math.round(years)} years ago`;
+  return years < 2 ? '一年多前' : `${Math.round(years)} 年前`;
 }
 
 /** What a scan tile says about its folder. */
 export function contentsLabel(r, now = Date.now()) {
-  if (!r.measured) return 'size unknown';
-  if (r.fileCount === 0) return 'empty — nothing saved here yet';
+  if (!r.measured) return '大小未知';
+  if (r.fileCount === 0) return '为空——这里还没有存档';
   // The "+" belongs on the number, not after the noun: counting stopped at a
   // cap, so it is a floor, not "files and a bit".
-  const files = `${r.fileCount}${r.truncated ? '+' : ''} file${r.fileCount === 1 ? '' : 's'}`;
+  const files = `${r.fileCount}${r.truncated ? '+' : ''} 个文件`;
   return `${files} · ${fmtBytes(r.totalBytes)} · ${fmtAge(r.latestMtime, now)}`;
 }
 

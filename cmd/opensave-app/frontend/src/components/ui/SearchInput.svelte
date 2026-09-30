@@ -1,6 +1,6 @@
 <script>
   export let value = '';
-  export let placeholder = 'Filter…';
+  export let placeholder = '筛选…';
 </script>
 
 <!-- data-find: what Ctrl+F focuses (see components/Shortcuts.svelte). -->

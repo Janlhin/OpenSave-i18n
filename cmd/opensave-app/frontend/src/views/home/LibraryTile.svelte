@@ -166,7 +166,7 @@
   </div>
   <div class="body">
     <div class="name">
-      {#if isFavourite($collections, game.id)}<span class="fav" title="In Favourites"><Star size={12} /></span>{/if}{game.name}
+      {#if isFavourite($collections, game.id)}<span class="fav" title="已在收藏中"><Star size={12} /></span>{/if}{game.name}
     </div>
     <div class="status tone-{status.tone}">
       {#if status.tone === 'warn'}<TriangleAlert size={13} class="status-icon" />{:else if status.tone === 'playing'}<Gamepad2
@@ -179,9 +179,9 @@
     </div>
     {#if cover === 'wide'}
       <div class="meta">
-        {snapshots} {snapshots === 1 ? 'snapshot' : 'snapshots'}{#if game.playtimeMs >= 60_000}{' · '}{playLength(game.playtimeMs)} played{/if}
+        {snapshots} 张快照{#if game.playtimeMs >= 60_000}{' · '}已游玩 {playLength(game.playtimeMs)}{/if}
         {#if game.activeBranch && game.activeBranch !== 'main'}
-          · on <strong>{game.activeBranch}</strong>
+          · 位于 <strong>{game.activeBranch}</strong> 分支
         {/if}
       </div>
     {/if}

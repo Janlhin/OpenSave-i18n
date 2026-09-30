@@ -29,10 +29,10 @@ function sameDay(a, b) {
 /** "Today", "Yesterday", or the date. */
 export function dayLabel(date, now = new Date()) {
   const d = date instanceof Date ? date : new Date(date);
-  if (sameDay(d, now)) return 'Today';
+  if (sameDay(d, now)) return '今天';
   const y = new Date(now);
   y.setDate(y.getDate() - 1);
-  if (sameDay(d, y)) return 'Yesterday';
+  if (sameDay(d, y)) return '昨天';
   return d.toLocaleDateString(undefined, {
     weekday: 'long',
     day: 'numeric',
@@ -45,7 +45,7 @@ export function dayLabel(date, now = new Date()) {
 export function humanizeComment(comment, now = new Date()) {
   return (comment ?? '').replace(/snap_\d{12,}/g, (id) => {
     const t = snapIdTime(id);
-    return t ? `the ${whenLabel(t, now)} snapshot` : id;
+    return t ? `${whenLabel(t, now)} 的快照` : id;
   });
 }
 
@@ -57,11 +57,11 @@ const safetyPattern = /^(before|pre-rollback|safety|auto backup before|this devi
 // The daemon's own wording for the copies it keeps, said plainly. Anything
 // not listed is shown as written.
 const plainTitles = [
-  [/^pre-rollback safety restore point \(before restoring (.+)\)$/i, (m) => `Before restoring ${m[1]}`],
-  [/^before sync replaced local files$/i, () => 'Before a sync replaced it'],
-  [/^safety snapshot before restoring file "(.+)" from (.+)$/i, (m) => `Before putting back ${m[1]} from ${m[2]}`],
-  [/^auto backup before switching to branch "(.+)"$/i, (m) => `Before switching to ${m[1]}`],
-  [/^branch "(.+)" created from "(.+)"$/i, (m) => `Start of ${m[1]}, copied from ${m[2]}`]
+  [/^pre-rollback safety restore point \(before restoring (.+)\)$/i, (m) => `恢复前：${m[1]}`],
+  [/^before sync replaced local files$/i, () => '同步替换本地文件之前'],
+  [/^safety snapshot before restoring file "(.+)" from (.+)$/i, (m) => `放回 ${m[1]} 前（来自 ${m[2]}）`],
+  [/^auto backup before switching to branch "(.+)"$/i, (m) => `切换到 ${m[1]} 之前`],
+  [/^branch "(.+)" created from "(.+)"$/i, (m) => `${m[1]} 的起点，复制自 ${m[2]}`]
 ];
 
 function plainTitle(comment) {
@@ -83,16 +83,16 @@ export function snapshotKind(snap, now = new Date()) {
   // not reasons, and read as noise on every row.
   if (/^(auto backup|manual snapshot)$/i.test(comment)) comment = '';
   if (!snap.isSystemAuto) {
-    return { kind: 'manual', label: 'Taken by you', title: comment || 'Snapshot' };
+    return { kind: 'manual', label: '手动创建', title: comment || '快照' };
   }
-  if (comment === '') return { kind: 'auto', label: 'Automatic', title: 'Save changed' };
-  if (/^initial snapshot$/i.test(comment)) return { kind: 'start', label: 'Automatic', title: 'When tracking started' };
+  if (comment === '') return { kind: 'auto', label: '自动', title: '存档发生变化' };
+  if (/^initial snapshot$/i.test(comment)) return { kind: 'start', label: '自动', title: '开始跟踪时' };
   // The save as a play session left it (daemon/sessions.go).
-  if (/^after playing/i.test(comment)) return { kind: 'session', label: 'After playing', title: comment };
+  if (/^after playing/i.test(comment)) return { kind: 'session', label: '游玩后', title: comment };
   if (safetyPattern.test(comment)) {
-    return { kind: 'safety', label: 'Safety copy', title: plainTitle(comment) };
+    return { kind: 'safety', label: '安全副本', title: plainTitle(comment) };
   }
-  return { kind: 'other', label: 'Automatic', title: plainTitle(comment) };
+  return { kind: 'other', label: '自动', title: plainTitle(comment) };
 }
 
 const capitalise = (s) => (s ? s[0].toUpperCase() + s.slice(1) : s);

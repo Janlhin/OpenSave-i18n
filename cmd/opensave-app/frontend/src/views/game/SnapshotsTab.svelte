@@ -54,10 +54,10 @@
   $: latestId = allSnapshots.find((s) => s.branch === game.activeBranch)?.id;
 
   // How a snapshot is named in a question about it.
-  const named = (snap) => `the snapshot from ${whenLabel(snap.timestamp, now)}`;
+  const named = (snap) => `来自 ${whenLabel(snap.timestamp, now)} 的快照`;
 
   const takeSnapshot = () =>
-    run('Snapshot created', async () => {
+    run('快照已创建', async () => {
       await api.post(`/api/games/${game.id}/snapshot`, { comment });
       comment = '';
     });
@@ -65,13 +65,13 @@
   // Asked with what it would change; see lib/restore.js.
   const rollback = async (snap) => {
     if (!(await askRestore(game, snap))) return;
-    return run('Snapshot restored', () => api.post(`/api/games/${game.id}/rollback`, { snapshotId: snap.id }));
+    return run('快照已恢复', () => api.post(`/api/games/${game.id}/rollback`, { snapshotId: snap.id }));
   };
 
   // Pinned: no limit, age rule or clean-up removes it. Not a lock — deleting
   // it by hand still works, and says so first.
   const togglePin = (snap) =>
-    run(snap.pinned ? 'Unpinned — the limits apply to it again' : 'Pinned — kept through every limit and clean-up', () =>
+    run(snap.pinned ? '已取消固定 — 限制规则重新对其生效' : '已固定 — 不受任何上限和清理影响', () =>
       api.patch(`/api/games/${game.id}/snapshot/${snap.id}`, { pinned: !snap.pinned })
     );
 
@@ -100,9 +100,9 @@
   }
 
   async function deleteSnapshot(snap) {
-    const pinnedLine = snap.pinned ? ' It is pinned, so nothing else would ever have removed it.' : '';
-    if (!(await askConfirm(`Delete ${named(snap)}?${pinnedLine} This can't be undone; your current save isn't affected.`, { title: 'Delete snapshot?', confirmText: 'Delete', danger: true }))) return;
-    run('Snapshot deleted', () => api.del(`/api/games/${game.id}/snapshot/${snap.id}`));
+    const pinnedLine = snap.pinned ? ' 它已被固定，否则其他任何规则也不会移除它。' : '';
+    if (!(await askConfirm(`删除${named(snap)}？${pinnedLine}此操作无法撤销；当前存档不受影响。`, { title: '删除快照？', confirmText: '删除', danger: true }))) return;
+    run('快照已删除', () => api.del(`/api/games/${game.id}/snapshot/${snap.id}`));
   }
 
   async function browseSnapshot(snap) {
@@ -115,29 +115,29 @@
   }
 
   const restoreFile = async (relPath) => {
-    if (!(await askConfirm(`Put "${relPath}" back from ${named(browsing.snap)}, over the file there now? The current file is kept in a snapshot first.`, { title: 'Restore file?', confirmText: 'Restore' }))) return;
-    return run(`Restored ${relPath}`, () =>
+    if (!(await askConfirm(`从${named(browsing.snap)}恢复“${relPath}”，覆盖当前位置的文件？当前文件会先保存在快照中。`, { title: '恢复文件？', confirmText: '恢复' }))) return;
+    return run(`已恢复 ${relPath}`, () =>
       api.post(`/api/games/${game.id}/snapshot/${browsing.snap.id}/restore-file`, { relPath })
     );
   };
 </script>
 
 <div class="card snap-new">
-  <input placeholder="Snapshot comment (optional)" bind:value={comment} on:keydown={(e) => e.key === 'Enter' && takeSnapshot()} />
-  <button class="btn primary" disabled={$busy} on:click={takeSnapshot}><Camera size={16} />Snapshot now</button>
+  <input placeholder="快照备注（可选）" bind:value={comment} on:keydown={(e) => e.key === 'Enter' && takeSnapshot()} />
+  <button class="btn primary" disabled={$busy} on:click={takeSnapshot}><Camera size={16} />立即快照</button>
 </div>
 
 {#if browsing}
   <div class="card browse">
     <div class="browse-head">
-      <h3>Files in {named(browsing.snap)}</h3>
-      <button class="btn small" on:click={() => (browsing = null)}>Close</button>
+      <h3>{named(browsing.snap)}中的文件</h3>
+      <button class="btn small" on:click={() => (browsing = null)}>关闭</button>
     </div>
     {#each browsing.files.filter((f) => !f.isDir) as f}
       <div class="file-row">
         <span class="file-path">{f.path}</span>
         <span class="file-size">{fmtSize(f.size)}</span>
-        <button class="btn small" disabled={$busy} on:click={() => restoreFile(f.path)}>Restore file</button>
+        <button class="btn small" disabled={$busy} on:click={() => restoreFile(f.path)}>恢复文件</button>
       </div>
     {/each}
   </div>
@@ -148,7 +148,7 @@
 {/if}
 
 {#if allSnapshots.length === 0}
-  <div class="empty"><h3>No snapshots yet</h3><p>Snapshots are created automatically when your save changes.</p></div>
+  <div class="empty"><h3>还没有快照</h3><p>存档变化时会自动创建快照。</p></div>
 {:else}
   <div bind:this={listEl}>
   {#each groups as group (group.day)}
@@ -164,24 +164,24 @@
           <div class="info">
             <div class="title">
               <span class="title-text">{k.title}</span>
-              {#if snap.id === latestId}<span class="tag latest">Latest</span>{/if}
-              {#if snap.problem}<span class="tag damaged" title={snap.problem}>Damaged</span>{/if}
+              {#if snap.id === latestId}<span class="tag latest">最新</span>{/if}
+              {#if snap.problem}<span class="tag damaged" title={snap.problem}>已损坏</span>{/if}
             </div>
             {#if noting === snap.id}
               <input
                 id="note-{snap.id}"
                 class="note-input"
-                placeholder="A note about this snapshot"
+                placeholder="关于这张快照的备注"
                 maxlength="500"
                 bind:value={noteDraft}
                 on:keydown={(e) => noteKeydown(e, snap)}
                 on:blur={() => saveNote(snap)}
               />
             {:else if snap.note}
-              <button class="note" title="Edit the note" on:click={() => startNote(snap)}>{snap.note}</button>
+              <button class="note" title="编辑备注" on:click={() => startNote(snap)}>{snap.note}</button>
             {/if}
             <div class="meta">
-              {#if snap.pinned}<span class="tag pinned"><Pin size={10} strokeWidth={2.6} />Pinned</span>{/if}
+              {#if snap.pinned}<span class="tag pinned"><Pin size={10} strokeWidth={2.6} />已固定</span>{/if}
               <span class="tag kind">{k.label}</span>
               {#if branchCount > 1}<span class="tag">{snap.branch}</span>{/if}
               <span>{fmtSize(snap.sizeBytes)}</span>
@@ -192,34 +192,34 @@
               class="btn small ghost icon"
               class:on={snap.pinned}
               disabled={$busy}
-              title={snap.pinned ? 'Unpin: let the snapshot limits apply to it again' : 'Pin: keep it through every limit and clean-up'}
-              aria-label={snap.pinned ? 'Unpin' : 'Pin'}
+              title={snap.pinned ? '取消固定：让快照上限规则重新对其生效' : '固定：不受任何上限和清理影响'}
+              aria-label={snap.pinned ? '取消固定' : '固定'}
               aria-pressed={snap.pinned}
               on:click={() => togglePin(snap)}
             >
               <svelte:component this={snap.pinned ? PinOff : Pin} size={14} />
             </button>
-            <button class="btn small ghost icon" title={snap.note ? 'Edit the note' : 'Add a note'} aria-label="Note" on:click={() => startNote(snap)}>
+            <button class="btn small ghost icon" title={snap.note ? '编辑备注' : '添加备注'} aria-label="备注" on:click={() => startNote(snap)}>
               <Pencil size={13} />
             </button>
             {#if allSnapshots.length > 1}
               <button
                 class="btn small ghost icon"
-                title="Compare with another snapshot"
-                aria-label="Compare"
+                title="与另一张快照比较"
+                aria-label="比较"
                 on:click={() => (comparing = snap)}
               >
                 <GitCompareArrows size={14} />
               </button>
             {/if}
-            <button class="btn small" on:click={() => browseSnapshot(snap)}>Files</button>
+            <button class="btn small" on:click={() => browseSnapshot(snap)}>文件</button>
             <button
               class="btn small"
               disabled={$busy || !!snap.problem}
-              title={snap.problem ? `This snapshot can't be restored: ${snap.problem}` : undefined}
-              on:click={() => rollback(snap)}>Restore</button
+              title={snap.problem ? `此快照无法恢复：${snap.problem}` : undefined}
+              on:click={() => rollback(snap)}>恢复</button
             >
-            <button class="btn small ghost-danger" disabled={$busy} title="Delete this snapshot" on:click={() => deleteSnapshot(snap)}>Delete</button>
+            <button class="btn small ghost-danger" disabled={$busy} title="删除这张快照" on:click={() => deleteSnapshot(snap)}>删除</button>
           </div>
         </div>
       {/each}

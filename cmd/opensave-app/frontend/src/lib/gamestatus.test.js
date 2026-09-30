@@ -20,8 +20,8 @@ describe('gameStatus', () => {
   });
 
   it('shows a sync in progress with its percentage', () => {
-    expect(gameStatus(game(), { activity: { state: 'running', percentage: 42 }, now }).label).toBe('Syncing 42%');
-    expect(gameStatus(game(), { activity: { state: 'running' }, now }).label).toBe('Syncing 0%');
+    expect(gameStatus(game(), { activity: { state: 'running', percentage: 42 }, now }).label).toBe('正在同步 42%');
+    expect(gameStatus(game(), { activity: { state: 'running' }, now }).label).toBe('正在同步 0%');
   });
 
   it('says so when the last sync failed', () => {
@@ -35,7 +35,7 @@ describe('gameStatus', () => {
 
   it('reports the most recent paired device, ignoring devices since unpaired', () => {
     const g = game({ lastSyncedWith: { p1: minsAgo(30), gone: minsAgo(1) } });
-    expect(gameStatus(g, { peers: { p1: {} }, now })).toMatchObject({ state: 'synced', label: 'Synced 30 min ago' });
+    expect(gameStatus(g, { peers: { p1: {} }, now })).toMatchObject({ state: 'synced', label: '已同步 30 分钟前' });
   });
 
   it('says a game has not synced when devices are paired but none has it', () => {
@@ -45,7 +45,7 @@ describe('gameStatus', () => {
 
   it('falls back to the newest snapshot when nothing is paired', () => {
     const g = game({ branches: snaps(minsAgo(120), minsAgo(4)) });
-    expect(gameStatus(g, { now })).toMatchObject({ state: 'local', label: 'Snapshot 4 min ago', tone: 'ok' });
+    expect(gameStatus(g, { now })).toMatchObject({ state: 'local', label: '上次快照 4 分钟前', tone: 'ok' });
   });
 
   it('says there is nothing yet for a game with no snapshots and no devices', () => {
@@ -80,7 +80,7 @@ describe('a damaged snapshot', () => {
       { game: { name: 'Hades', branches: { main: { snapshots: [{ timestamp: minsAgo(5), problem: 'slot1.sav no longer matches its checksum' }] } } }, status: { state: 'local' } },
       { game: { name: 'Celeste', branches: { main: { snapshots: [{ timestamp: minsAgo(5) }] } } }, status: { state: 'local' } }
     ];
-    expect(librarySummary(rows)).toEqual({ tone: 'warn', headline: "A snapshot of Hades can't be restored" });
+    expect(librarySummary(rows)).toEqual({ tone: 'warn', headline: 'Hades 的一个快照无法恢复' });
   });
 });
 
@@ -89,11 +89,11 @@ describe('a game being played', () => {
     const since = '2026-09-25T18:00:00Z';
     expect(gameStatus(game({ id: 'h', name: 'Hades', playingSince: since }), { now: Date.parse(since) + 20_000 })).toMatchObject({
       state: 'playing',
-      label: 'In session',
+      label: '游玩中',
       tone: 'playing'
     });
     expect(gameStatus(game({ id: 'h', name: 'Hades', playingSince: since }), { now: Date.parse(since) + 72 * 60_000 }).label).toBe(
-      'In session for 1 h 12 min'
+      '已游玩 1 小时 12 分钟'
     );
     // Before a sync in flight: being played is what matters about it.
     expect(gameStatus(game({ id: 'h', playingSince: since }), { activity: { state: 'running', percentage: 40 } }).state).toBe('playing');
@@ -111,12 +111,12 @@ describe('a game being played', () => {
 describe('a missing save folder', () => {
   it('comes before everything else, for the game and for the library', () => {
     const g = game({ id: 'h', name: 'Hades', savePathMissing: true });
-    expect(gameStatus(g, { conflicted: true })).toMatchObject({ state: 'missing', tone: 'warn', label: 'Save folder missing' });
+    expect(gameStatus(g, { conflicted: true })).toMatchObject({ state: 'missing', tone: 'warn', label: '存档文件夹丢失' });
     const rows = [
       { game: g, status: { state: 'missing' } },
       { game: game({ id: 'c', name: 'Celeste' }), status: { state: 'conflict' } }
     ];
-    expect(librarySummary(rows)).toEqual({ tone: 'warn', headline: "Hades's save folder is missing" });
+    expect(librarySummary(rows)).toEqual({ tone: 'warn', headline: 'Hades 的存档文件夹丢失' });
     expect(sortRows(rows, 'attention').map((r) => r.game.name)).toEqual(['Hades', 'Celeste']);
   });
 });
@@ -182,14 +182,14 @@ describe('librarySummary', () => {
   it('leads with a waiting decision, naming the game when there is one', () => {
     expect(librarySummary([row('Hades', 'conflict'), row('Celeste', 'syncing')])).toEqual({
       tone: 'warn',
-      headline: 'Hades needs a decision'
+      headline: 'Hades 需要做出决定'
     });
-    expect(librarySummary([row('A', 'conflict'), row('B', 'conflict')]).headline).toBe('2 games need a decision');
+    expect(librarySummary([row('A', 'conflict'), row('B', 'conflict')]).headline).toBe('2 个游戏需要做出决定');
   });
 
   it('then a sync in progress', () => {
-    expect(librarySummary([row('Celeste', 'syncing'), row('A', 'error')]).headline).toBe('Syncing Celeste…');
-    expect(librarySummary([row('A', 'syncing'), row('B', 'syncing')]).headline).toBe('Syncing 2 games…');
+    expect(librarySummary([row('Celeste', 'syncing'), row('A', 'error')]).headline).toBe('正在同步 Celeste…');
+    expect(librarySummary([row('A', 'syncing'), row('B', 'syncing')]).headline).toBe('正在同步 2 个游戏…');
   });
 
   it('then a failed sync, which retries on its own', () => {
@@ -197,23 +197,23 @@ describe('librarySummary', () => {
   });
 
   it('then games with nothing saved yet, then auto-sync switched off', () => {
-    expect(librarySummary([row('A', 'empty'), row('B', 'paused')]).headline).toBe('1 game has no snapshot yet');
-    expect(librarySummary([row('A', 'paused'), row('B', 'local')]).headline).toBe('Auto-sync is off for 1 game');
+    expect(librarySummary([row('A', 'empty'), row('B', 'paused')]).headline).toBe('1 个游戏还没有快照');
+    expect(librarySummary([row('A', 'paused'), row('B', 'local')]).headline).toBe('1 个游戏已关闭自动同步');
   });
 
   it('otherwise says everything is backed up', () => {
     expect(librarySummary([row('A', 'local'), row('B', 'synced'), row('C', 'unsynced')])).toEqual({
       tone: 'ok',
-      headline: 'All 3 games are backed up'
+      headline: '全部 3 个游戏已备份'
     });
-    expect(librarySummary([row('A', 'local')]).headline).toBe('Your game is backed up');
+    expect(librarySummary([row('A', 'local')]).headline).toBe('你的游戏已备份');
   });
 
   it('never counts a game with no snapshot as backed up, whatever its sync says', () => {
     const unsyncedAndEmpty = row('Hades', 'unsynced', []);
     expect(librarySummary([row('A', 'synced'), unsyncedAndEmpty])).toEqual({
       tone: 'muted',
-      headline: '1 game has no snapshot yet'
+      headline: '1 个游戏还没有快照'
     });
   });
 });

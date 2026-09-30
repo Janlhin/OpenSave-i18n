@@ -91,8 +91,8 @@
     class="bell"
     class:has={count > 0}
     on:click={toggle}
-    title={count ? `${count} notification${count === 1 ? '' : 's'}` : 'Notifications'}
-    aria-label={count ? `Notifications, ${count} new` : 'Notifications'}
+    title={count ? `${count} 条通知` : '通知'}
+    aria-label={count ? `通知，${count} 条新消息` : '通知'}
     aria-expanded={open}
   >
     <Bell size={14} />
@@ -101,16 +101,16 @@
 
   {#if open}
     <!-- Unfolds out of the bell and folds back into it (lib/motion.js). -->
-    <div class="panel" bind:this={panel} role="dialog" aria-label="Notifications" transition:unfold>
+    <div class="panel" bind:this={panel} role="dialog" aria-label="通知" transition:unfold>
       <div class="head">
-        <span class="title">Notifications</span>
+        <span class="title">通知</span>
         {#if events.some((e) => e.unread)}
-          <button class="linklike" on:click={markAllRead}>Mark all as read</button>
+          <button class="linklike" on:click={markAllRead}>全部标为已读</button>
         {/if}
       </div>
       <div class="scroll">
         {#if waiting.length}
-          <div class="section">Needs you</div>
+          <div class="section">待处理</div>
           {#each waiting as w, i (w.id)}
             <button class="item tone-{w.tone}" style="--i: {i}" on:click={() => go(w)}>
               {#if w.gameId && $games[w.gameId]}
@@ -123,7 +123,7 @@
           {/each}
         {/if}
         {#if events.length}
-          <div class="section">Earlier</div>
+          <div class="section">较早</div>
           {#each events as e, i (e.id)}
             <button class="item" class:unread={e.unread} style="--i: {Math.min(waiting.length + i, 10)}" on:click={() => go(e)}>
               {#if e.example}
@@ -135,16 +135,16 @@
                 <span class="t">{e.title}</span>
                 <span class="d">{e.detail ? `${e.detail} · ` : ''}{timeAgo(iso(e.atMs), now)}</span>
               </span>
-              {#if e.unread}<span class="dot" aria-label="Unread"></span>{/if}
+              {#if e.unread}<span class="dot" aria-label="未读"></span>{/if}
             </button>
           {/each}
         {/if}
         {#if !waiting.length && !events.length}
-          <div class="empty">Nothing new. Syncs, saves from your other devices and anything that needs you show up here.</div>
+          <div class="empty">暂无新内容。同步、来自其他设备的存档以及需要你处理的事项都会显示在这里。</div>
         {/if}
       </div>
       <div class="foot">
-        <button class="linklike" on:click={() => go({ go: { view: 'activity' } })}>See all activity</button>
+        <button class="linklike" on:click={() => go({ go: { view: 'activity' } })}>查看全部动态</button>
       </div>
     </div>
   {/if}

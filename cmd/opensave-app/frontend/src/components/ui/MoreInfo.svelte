@@ -10,7 +10,7 @@
 </script>
 
 <button type="button" class="more-toggle" aria-expanded={open} on:click|preventDefault={() => (open = !open)}>
-  <Info size={12} strokeWidth={2.4} />{open ? 'Less' : 'More'}
+  <Info size={12} strokeWidth={2.4} />{open ? '收起' : '详情'}
 </button>
 {#if open}<span class="more-body"><slot /></span>{/if}
 

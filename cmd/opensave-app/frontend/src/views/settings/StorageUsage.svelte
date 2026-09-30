@@ -32,7 +32,7 @@
     busy = true;
     try {
       const res = await api.post('/api/snapshots/prune', {});
-      toast(res.removed > 0 ? `Removed ${plural(res.removed, 'snapshot')}, freed ${fmtSize(res.freedBytes)}` : 'Nothing to clean up', 'success');
+      toast(res.removed > 0 ? `已删除 ${res.removed} 个快照，释放 ${fmtSize(res.freedBytes)}` : '没有可清理的内容', 'success');
     } catch (e) {
       toast(e.message, 'error');
     } finally {
@@ -49,8 +49,8 @@
       const res = await api.post('/api/storage/compact', {});
       toast(
         res.compacted > 0
-          ? `${res.compacted} snapshot${res.compacted === 1 ? '' : 's'} now share${res.compacted === 1 ? 's' : ''} unchanged files · ${fmtSize(res.freed)} freed`
-          : 'Nothing more to share',
+          ? `${res.compacted} 个快照现在共享未更改的文件 · 释放 ${fmtSize(res.freed)}`
+          : '没有更多可共享的内容',
         'success'
       );
     } catch (e) {
@@ -64,11 +64,11 @@
   $: saving = report && report.diskBytes > 0 ? Math.max(0, report.totalBytes - report.diskBytes) : 0;
 
   async function remove(s) {
-    const pinned = s.pinned ? ' It is pinned, so nothing else would ever have removed it.' : '';
-    if (!(await askConfirm(`Delete the ${fmtSize(s.bytes)} snapshot of ${s.gameName} from ${whenLabel(s.timestamp)}?${pinned} This can't be undone; the current save isn't affected.`, { title: 'Delete snapshot?', confirmText: 'Delete', danger: true }))) return;
+    const pinned = s.pinned ? ' 它已固定，其他任何清理都不会移除它。' : '';
+    if (!(await askConfirm(`删除 ${s.gameName} 在 ${whenLabel(s.timestamp)} 的 ${fmtSize(s.bytes)} 快照？${pinned}此操作无法撤销；当前存档不受影响。`, { title: '删除快照？', confirmText: '删除', danger: true }))) return;
     try {
       await api.del(`/api/games/${s.gameId}/snapshot/${s.snapshotId}`);
-      toast(`Freed ${fmtSize(s.bytes)}`, 'success');
+      toast(`已释放 ${fmtSize(s.bytes)}`, 'success');
     } catch (e) {
       toast(e.message, 'error');
     }
@@ -77,51 +77,49 @@
 </script>
 
 {#if error}
-  <p class="hint">Couldn't read storage: {error}</p>
+  <p class="hint">无法读取存储信息：{error}</p>
 {:else if !report}
   <div class="skeleton" style="height: 120px"></div>
 {:else}
   <div class="summary">
     <div>
       <div class="total">{fmtSize(report.totalBytes)}</div>
-      <div class="hint">in {report.snapshots} snapshot{report.snapshots === 1 ? '' : 's'}{#if report.freeKnown}{' · '}{fmtSize(report.freeBytes)} free on that drive{/if}</div>
+      <div class="hint">{report.snapshots} 个快照{#if report.freeKnown}{' · '}该磁盘剩余 {fmtSize(report.freeBytes)}{/if}</div>
     </div>
     <button class="btn small" class:primary={report.reclaimable > 0} disabled={busy || report.reclaimable === 0} on:click={cleanUp}>
       <BrushCleaning size={14} />
-      {#if busy}Cleaning up…{:else if report.reclaimable > 0}Clean up now · frees {fmtSize(report.reclaimable)}{:else}Nothing to clean up{/if}
+      {#if busy}清理中…{:else if report.reclaimable > 0}立即清理 · 可释放 {fmtSize(report.reclaimable)}{:else}没有可清理的内容{/if}
     </button>
   </div>
   {#if report.reclaimable > 0}
     <p class="hint">
-      {report.reclaimableSnapshots} snapshot{report.reclaimableSnapshots === 1 ? ' is' : 's are'} past a game's limits, on an old
-      conflict branch, or past the age rule. Pinned snapshots are never among them.
+      {report.reclaimableSnapshots} 个快照超出游戏限额、位于旧冲突分支或超过时限。已固定的快照绝不在其中。
     </p>
   {/if}
   <div class="sharing">
     <Layers size={14} />
     <p class="hint">
       {#if saving > 0}
-        <strong>{fmtSize(report.diskBytes)} on disk</strong> — {fmtSize(saving)} less, because older snapshots keep the files they
-        have in common once rather than each keeping its own copy.
+        磁盘上实际占用 <strong>{fmtSize(report.diskBytes)}</strong> —— 少了 {fmtSize(saving)}，因为较旧的快照对相同文件只保留一份，
+        而不是各留一份副本。
       {:else}
-        Older snapshots keep the files they have in common once rather than each keeping its own copy, so a game with many save slots
-        doesn't store every slot again in every snapshot.
+        较旧的快照对相同文件只保留一份而不是各留一份副本，因此存档槽位很多的项目不必在每个快照中都重复存储每个槽位。
       {/if}
-      The newest snapshot of each branch and pinned ones keep complete copies of their own.
+      每条分支的最新快照和已固定的快照会保留完整副本。
     </p>
-    <button class="btn small ghost" disabled={sharing} on:click={shareNow}>{sharing ? 'Sharing…' : 'Share now'}</button>
+    <button class="btn small ghost" disabled={sharing} on:click={shareNow}>{sharing ? '共享中…' : '立即共享'}</button>
   </div>
 
   {#if report.games.length}
     <ul class="games">
       {#each report.games as g}
         <li>
-          <button class="game" on:click={() => navigate('game', { gameId: g.gameId })} title="Open {g.name}">
+          <button class="game" on:click={() => navigate('game', { gameId: g.gameId })} title="打开 {g.name}">
             <span class="name">{g.name}</span>
             <span class="bar"><span style="width: {Math.max(2, (g.bytes / largest) * 100)}%"></span></span>
             <span class="size">{fmtSize(g.bytes)}</span>
             <span class="meta">
-              {g.snapshots} snapshot{g.snapshots === 1 ? '' : 's'}{#if g.pinned}{' · '}{g.pinned} pinned{/if}{#if g.diskBytes > 0 && g.diskBytes < g.bytes}{' · '}{fmtSize(g.diskBytes)} on disk{/if}{#if g.reclaimable}{' · '}{fmtSize(g.reclaimable)} to clean up{/if}
+              {g.snapshots} 个快照{#if g.pinned}{' · '}{g.pinned} 个已固定{/if}{#if g.diskBytes > 0 && g.diskBytes < g.bytes}{' · '}磁盘上 {fmtSize(g.diskBytes)}{/if}{#if g.reclaimable}{' · '}{fmtSize(g.reclaimable)} 可清理{/if}
             </span>
           </button>
         </li>
@@ -130,7 +128,7 @@
   {/if}
 
   {#if report.biggest.length}
-    <h4>Biggest snapshots</h4>
+    <h4>最大的快照</h4>
     <ul class="biggest">
       {#each report.biggest as s}
         <li>
@@ -139,8 +137,8 @@
             <span class="name">{s.gameName}</span>
             <span class="meta">{whenLabel(s.timestamp)}{#if s.note}{' · '}{s.note}{/if}</span>
           </span>
-          {#if s.pinned}<span class="pinned"><Pin size={11} />Pinned</span>{/if}
-          <button class="btn small ghost icon" title="Delete this snapshot" aria-label="Delete snapshot" on:click={() => remove(s)}><Trash2 size={14} /></button>
+          {#if s.pinned}<span class="pinned"><Pin size={11} />已固定</span>{/if}
+          <button class="btn small ghost icon" title="删除此快照" aria-label="删除快照" on:click={() => remove(s)}><Trash2 size={14} /></button>
         </li>
       {/each}
     </ul>

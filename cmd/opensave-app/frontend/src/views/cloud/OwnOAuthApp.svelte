@@ -48,9 +48,9 @@
       );
       if (changed && wasConnected) {
         await api.post('/api/auth/disconnect');
-        toast('Saved. Sign in again — the old connection belonged to the previous app.', 'success');
+        toast('已保存。请重新登录——旧连接属于之前的应用。', 'success');
       } else {
-        toast(ownAppID.trim() ? 'Saved. Sign in to use your own app.' : 'Cleared — the built-in app will be used.', 'success');
+        toast(ownAppID.trim() ? '已保存。请登录以使用你自己的应用。' : '已清除——将使用内置应用。', 'success');
       }
       // Reload for the fresh tokens/ids, but keep this card selected. The
       // stored provider is whatever was last saved with "Save provider" — so
@@ -69,15 +69,15 @@
 <div class="own-app">
   {#if needsOwnApp(provider) && !ownAppID}
     <p class="quiet required">
-      <strong>OneDrive needs your own app registration.</strong> Microsoft doesn't allow a
-      shared one, so OpenSave can't ship credentials for it. Create a free app in the
-      <button class="linkish" on:click={() => native.openExternal('https://portal.azure.com/#view/Microsoft_AAD_RegisteredApps/ApplicationsListBlade')}>Azure portal</button>
-      with redirect URI <code>http://localhost/callback</code>, then paste its Application
-      (client) ID below.
+      <strong>OneDrive 需要你自己的应用注册。</strong> Microsoft 不允许共享凭据，因此 OpenSave
+      无法为它内置凭据。请先在
+      <button class="linkish" on:click={() => native.openExternal('https://portal.azure.com/#view/Microsoft_AAD_RegisteredApps/ApplicationsListBlade')}>Azure 门户</button>
+      创建一个免费应用，重定向 URI 填 <code>http://localhost/callback</code>，然后将其应用程序
+      （客户端）ID 粘贴到下方。
     </p>
   {:else}
     <button class="linkish" on:click={() => (showOwnApp = !showOwnApp)}>
-      <Chevron open={showOwnApp} size={12} /> Use your own OAuth app{ownAppID ? ' (in use)' : ''}
+      <Chevron open={showOwnApp} size={12} /> 使用你自己的 OAuth 应用{ownAppID ? '（使用中）' : ''}
     </button>
   {/if}
 
@@ -85,15 +85,14 @@
     <div class="body">
       {#if provider === 'google_drive'}
         <p class="quiet">
-          OpenSave's built-in Google credentials are a shared app still in testing, so Drive
-          can ask you to sign in again every week. Your own Client ID stops that. Create one
-          in the
-          <button class="linkish" on:click={() => native.openExternal('https://console.cloud.google.com/apis/credentials')}>Google Cloud console</button>
-          as an OAuth client with redirect URI <code>http://localhost/callback</code>.
+          OpenSave 内置的 Google 凭据是一个仍在测试阶段的共享应用，因此 Drive 可能每周都要求你
+          重新登录。使用你自己的 Client ID 可以避免这一点。请在
+          <button class="linkish" on:click={() => native.openExternal('https://console.cloud.google.com/apis/credentials')}>Google Cloud 控制台</button>
+          创建一个 OAuth 客户端，重定向 URI 填 <code>http://localhost/callback</code>。
         </p>
       {:else if provider === 'dropbox'}
         <p class="quiet">
-          Only needed if you'd rather use your own Dropbox app than the built-in one.
+          仅当你想使用自己的 Dropbox 应用而非内置应用时才需要填写。
         </p>
       {/if}
       <div class="field">
@@ -102,30 +101,29 @@
           id="cb-clientid"
           bind:value={ownAppID}
           spellcheck="false"
-          placeholder={provider === 'google_drive' ? '…apps.googleusercontent.com' : 'Application (client) ID'}
+          placeholder={provider === 'google_drive' ? '…apps.googleusercontent.com' : '应用程序（客户端）ID'}
         />
       </div>
       <div class="field">
-        <label for="cb-clientsecret">Client secret <span class="quiet">— leave empty unless your app requires one</span></label>
+        <label for="cb-clientsecret">Client secret <span class="quiet">——除非你的应用要求，否则请留空</span></label>
         <input id="cb-clientsecret" type="password" bind:value={ownAppSecret} spellcheck="false" />
       </div>
       <div class="path-row">
-        <button class="btn primary" disabled={$busy} on:click={save}>Save credentials</button>
+        <button class="btn primary" disabled={$busy} on:click={save}>保存凭据</button>
         {#if ownAppID}
           <button
             class="btn small"
             disabled={$busy}
-            title="Go back to OpenSave's built-in credentials"
+            title="恢复使用 OpenSave 内置的凭据"
             on:click={() => { ownAppID = ''; ownAppSecret = ''; save(); }}
           >
-            Use the built-in app
+            使用内置应用
           </button>
         {/if}
       </div>
       {#if connected === provider}
         <p class="quiet">
-          You're signed in already — changing this disconnects you, because the existing
-          sign-in belongs to the old app.
+          你已经登录——修改此处会使你断开连接，因为现有登录属于旧的应用。
         </p>
       {/if}
     </div>

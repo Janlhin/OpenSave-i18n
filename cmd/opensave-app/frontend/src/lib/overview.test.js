@@ -23,11 +23,11 @@ describe('recentEvents', () => {
   it('lists snapshots and syncs newest first, a run of the same as one line', () => {
     const events = recentEvents(games, peers, { now });
     expect(events.map((e) => [e.game.id, e.title, e.count])).toEqual([
-      ['hades', 'Synced with Steam Deck', 1],
-      ['hades', 'Save changed', 3],
+      ['hades', '与 Steam Deck 同步', 1],
+      ['hades', '存档发生变化', 3],
       ['hades', 'Before the boss', 1],
-      ['celeste', 'Save changed', 1],
-      ['hades', 'Save changed', 1]
+      ['celeste', '存档发生变化', 1],
+      ['hades', '存档发生变化', 1]
     ]);
     expect(events[1].at).toBe(new Date(at(0, 10)).getTime());
   });

@@ -104,13 +104,13 @@
     const { now, fresh } = newlyEmptied(emptiedBefore, all);
     emptiedBefore = now;
     for (const g of fresh) {
-      toast(`Every save file of ${g.name} was deleted here. Your other devices keep theirs until you choose.`, 'warning', {
+      toast(`${g.name} 的所有存档文件已在此删除。在你做出选择前，其他设备会保留它们的文件。`, 'warning', {
         ttl: 15000,
-        action: { label: 'Choose', run: () => navigate('game', { gameId: g.id }) }
+        action: { label: '去处理', run: () => navigate('game', { gameId: g.id }) }
       });
       demandAttention('emptied', {
         title: g.name,
-        body: 'Every save file was deleted here. Your other devices keep theirs until you choose.',
+        body: '所有存档文件已在此删除。在你做出选择前，其他设备会保留它们的文件。',
         game: g
       });
     }
@@ -191,34 +191,34 @@
     <div class="update-banner installing">
       <span class="with-icon">
         {#if $appUpdate.state === 'downloading'}
-          <Download size={16} /> Updating OpenSave — downloading {$appUpdate.percentage ?? 0}%…
+          <Download size={16} /> 正在更新 OpenSave——已下载 {$appUpdate.percentage ?? 0}%…
         {:else if $appUpdate.state === 'installing'}
-          <Wrench size={16} /> Installing update…
+          <Wrench size={16} /> 正在安装更新…
         {:else}
-          <RefreshCw size={16} /> Restarting with the new version…
+          <RefreshCw size={16} /> 正在以新版本重启…
         {/if}
-        <em>The app restarts itself when done — your games keep syncing.</em>
+        <em>完成后应用会自行重启——你的游戏会继续同步。</em>
       </span>
     </div>
   {:else if update}
     <div class="update-banner">
-      <span class="with-icon"><Sparkles size={16} /> OpenSave {update.latest} is available — you're on {update.current}.</span>
+      <span class="with-icon"><Sparkles size={16} /> OpenSave {update.latest} 可用——当前版本为 {update.current}。</span>
       <div class="update-actions">
         {#if update.notes}
           <button class="btn small ghost" on:click={() => (showNotes = !showNotes)}>
-            {showNotes ? 'Hide notes' : "What's new"}
+            {showNotes ? '收起说明' : '更新内容'}
           </button>
         {/if}
         {#if update.assetUrl}
           <button class="btn small primary" disabled={installStarted} on:click={installRelease}>
-            {installStarted ? 'Starting…' : 'Install & restart'}
+            {installStarted ? '正在启动…' : '安装并重启'}
           </button>
         {:else if update.flatpak}
-          <button class="btn small primary" on:click={() => native.openExternal(update.url)}>Get .flatpak</button>
+          <button class="btn small primary" on:click={() => native.openExternal(update.url)}>获取 .flatpak</button>
         {:else}
-          <button class="btn small primary" on:click={() => native.openExternal(update.url)}>Download</button>
+          <button class="btn small primary" on:click={() => native.openExternal(update.url)}>下载</button>
         {/if}
-        <button class="btn small ghost icon" on:click={() => (update = null)} aria-label="Dismiss" title="Dismiss"><X size={15} /></button>
+        <button class="btn small ghost icon" on:click={() => (update = null)} aria-label="关闭" title="关闭"><X size={15} /></button>
       </div>
     </div>
     {#if showNotes && update.notes}
@@ -226,10 +226,10 @@
     {/if}
   {:else if updatedTo}
     <div class="update-banner">
-      <span class="with-icon"><Sparkles size={16} /> OpenSave was updated to v{updatedTo}.</span>
+      <span class="with-icon"><Sparkles size={16} /> OpenSave 已更新到 v{updatedTo}。</span>
       <div class="update-actions">
-        <button class="btn small primary" on:click={openWhatsNew}>What's new</button>
-        <button class="btn small ghost icon" on:click={() => (updatedTo = '')} aria-label="Dismiss" title="Dismiss"><X size={15} /></button>
+        <button class="btn small primary" on:click={openWhatsNew}>更新内容</button>
+        <button class="btn small ghost icon" on:click={() => (updatedTo = '')} aria-label="关闭" title="关闭"><X size={15} /></button>
       </div>
     </div>
   {/if}
@@ -245,13 +245,13 @@
     {#if bootError}
       <div class="boot-error">
         <img class="boot-logo" src={logoUrl} alt="OpenSave" />
-        <h2>OpenSave failed to start</h2>
+        <h2>OpenSave 启动失败</h2>
         <p>{bootError}</p>
         <button class="btn primary" disabled={retrying} on:click={boot}>
-          {retrying ? 'Retrying…' : 'Retry'}
+          {retrying ? '正在重试…' : '重试'}
         </button>
         <p class="boot-hint">
-          Details are saved to <code>.opensave\opensave.log</code> in your user folder.
+          详细信息已保存到你用户文件夹下的 <code>.opensave\opensave.log</code>。
         </p>
       </div>
     {:else if ready}
@@ -283,7 +283,7 @@
     {:else}
       <div class="boot-loading">
         <img class="boot-logo pulse" src={logoUrl} alt="OpenSave" />
-        <span>Starting OpenSave…</span>
+        <span>正在启动 OpenSave…</span>
       </div>
     {/if}
   </div>

@@ -25,10 +25,10 @@ export function protectionState(peer) {
 }
 
 export const PROTECTION_LABELS = {
-  sealed: 'Encrypted',
-  pending: 'Encrypting shortly',
-  open: 'Not encrypted',
-  direct: 'Direct connection',
+  sealed: '已加密',
+  pending: '即将加密',
+  open: '未加密',
+  direct: '直接连接',
 };
 
 export const PROTECTION_ICONS = {
@@ -40,12 +40,12 @@ export const PROTECTION_ICONS = {
 
 export const PROTECTION_DETAILS = {
   sealed:
-    'Saves sent to this device are sealed between the two of you. The relay — and anyone else holding your room code — passes them on without being able to read them.',
+    '发送到这台设备的存档在你们两台设备之间加密。中继——以及任何持有你房间码的人——只会原样转发，无法读取内容。',
   pending:
-    'The key is in place. Encryption starts as soon as this device checks in, which usually takes a few seconds.',
-  open: 'Saves sent to this device over the internet can be read by anyone holding your room code, including whoever runs the relay. Pairing over a relay did not keep an encryption key in older versions. Unpair and pair these two devices again to fix it.',
+    '密钥已就位。这台设备签入后就会开始加密，通常只需几秒钟。',
+  open: '通过互联网发送到这台设备的存档，任何持有你房间码的人都能读取，包括中继的运营者。旧版本通过中继配对时没有保存加密密钥。解除配对后重新配对这两台设备即可修复。',
   direct:
-    'This device is reached straight over your local network, so nothing passes through a relay. Local traffic is not encrypted, so treat an untrusted network accordingly.',
+    '这台设备通过你的本地网络直接连接，不经过任何中继。本地流量未加密，请对不可信的网络保持警惕。',
 };
 
 /**

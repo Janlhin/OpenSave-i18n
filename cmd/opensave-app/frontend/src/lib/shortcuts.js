@@ -9,24 +9,24 @@ export const shortcutsOpen = writable(false);
 
 // Pages in the order of the sidebar, for Ctrl+1 … Ctrl+6.
 export const PAGES = [
-  { id: 'home', label: 'Home' },
-  { id: 'devices', label: 'Devices' },
-  { id: 'cloud', label: 'Cloud Backup' },
-  { id: 'activity', label: 'Activity' },
-  { id: 'settings', label: 'Settings' },
-  { id: 'changelog', label: 'Changelog' }
+  { id: 'home', label: '主页' },
+  { id: 'devices', label: '设备' },
+  { id: 'cloud', label: '云备份' },
+  { id: 'activity', label: '活动' },
+  { id: 'settings', label: '设置' },
+  { id: 'changelog', label: '更新日志' }
 ];
 
 /** For the sheet: [keys, what they do], in the order shown. */
 export const SHORTCUTS = [
-  ['Ctrl K', 'Jump to a game, a page or an action'],
-  ['Ctrl F', 'Search the page you are on'],
-  ...PAGES.map((p, i) => [`Ctrl ${i + 1}`, `Go to ${p.label}`]),
-  ['Ctrl ,', 'Settings'],
-  ['← → ↑ ↓', 'Move between games in the library'],
-  ['Shift F10', 'Actions for the focused game (or the menu key)'],
-  ['?', 'This list'],
-  ['Esc', 'Close a dialog or menu']
+  ['Ctrl K', '跳转到游戏、页面或操作'],
+  ['Ctrl F', '在当前页面搜索'],
+  ...PAGES.map((p, i) => [`Ctrl ${i + 1}`, `前往${p.label}`]),
+  ['Ctrl ,', '设置'],
+  ['← → ↑ ↓', '在库中的游戏之间移动'],
+  ['Shift F10', '对焦点游戏执行操作（或按菜单键）'],
+  ['?', '此列表'],
+  ['Esc', '关闭对话框或菜单']
 ];
 
 /** Whether keys pressed now are someone typing, which a bare key must not interrupt. */

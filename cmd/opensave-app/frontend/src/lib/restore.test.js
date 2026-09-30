@@ -34,10 +34,10 @@ describe('summarize', () => {
 });
 
 describe('describeSummary', () => {
-  it('says only what applies, in the singular or plural', () => {
-    expect(describeSummary({ changed: 2, restored: 1, removed: 1 })).toBe('2 files change, 1 comes back, 1 is removed');
-    expect(describeSummary({ changed: 1, restored: 0, removed: 3 })).toBe('1 file changes, 3 are removed');
-    expect(describeSummary({ changed: 0, restored: 2, removed: 0 })).toBe('2 come back');
+  it('says only what applies', () => {
+    expect(describeSummary({ changed: 2, restored: 1, removed: 1 })).toBe('2 个文件将被更改，1 个文件将被恢复，1 个文件将被删除');
+    expect(describeSummary({ changed: 1, restored: 0, removed: 3 })).toBe('1 个文件将被更改，3 个文件将被删除');
+    expect(describeSummary({ changed: 0, restored: 2, removed: 0 })).toBe('2 个文件将被恢复');
   });
 });
 

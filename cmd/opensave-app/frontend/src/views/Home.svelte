@@ -49,7 +49,7 @@
       showAdd = true;
       return;
     }
-    const dir = await native.selectDirectory('Choose the save folder to track');
+    const dir = await native.selectDirectory('选择要跟踪的存档文件夹');
     if (dir) {
       addPath = dir;
       showAdd = true;
@@ -70,7 +70,7 @@
     for (const g of $gameList) {
       api.post(`/api/games/${g.id}/sync`).catch(() => {});
     }
-    toast('Sync triggered for all games');
+    toast('已为所有游戏触发同步');
   }
 
   // Where each game's save stands — the summary and the cards read the same
@@ -101,14 +101,14 @@
 </script>
 
 <div class="head">
-  <h2 class="page-title">Home</h2>
+  <h2 class="page-title">首页</h2>
   <div class="head-actions">
-    <button class="btn primary" on:click={() => scanner.start()} disabled={scanning} title="Look for game saves on this device">
-      <ScanSearch size={16} />{scanning ? 'Scanning…' : 'Scan saves'}
+    <button class="btn primary" on:click={() => scanner.start()} disabled={scanning} title="在本设备上查找游戏存档">
+      <ScanSearch size={16} />{scanning ? '扫描中…' : '扫描存档'}
     </button>
-    <button class="btn" on:click={syncAll} disabled={$gameList.length === 0 || $syncPause.paused} title={$syncPause.paused ? 'Syncing is paused' : ''}><RefreshCw size={15} />Sync all</button>
+    <button class="btn" on:click={syncAll} disabled={$gameList.length === 0 || $syncPause.paused} title={$syncPause.paused ? '同步已暂停' : ''}><RefreshCw size={15} />全部同步</button>
     <PauseButton />
-    <button class="btn" on:click={trackFolder} title="Pick a save folder or file to track"><FolderPlus size={16} />Track folder</button>
+    <button class="btn" on:click={trackFolder} title="选择要跟踪的存档文件夹或文件"><FolderPlus size={16} />跟踪文件夹</button>
   </div>
 </div>
 
@@ -127,15 +127,15 @@
 {:else if $visibleGames.length === 0}
   <div class="welcome">
     <div class="welcome-icon"><Gamepad2 size={34} strokeWidth={1.6} /></div>
-    <h3>Welcome to OpenSave</h3>
-    <p>Keep your game saves in sync across every device — no accounts, no cloud lock-in. Start by finding your saves:</p>
+    <h3>欢迎使用 OpenSave</h3>
+    <p>让你的游戏存档在每台设备间保持同步——无需账号，不锁定云端。先找到你的存档：</p>
     <div class="welcome-actions">
       <button class="btn primary" on:click={() => scanner.start()} disabled={scanning}>
-        <ScanSearch size={16} />{scanning ? 'Scanning…' : 'Scan for saves'}
+        <ScanSearch size={16} />{scanning ? '扫描中…' : '扫描存档'}
       </button>
-      <button class="btn" on:click={trackFolder}><FolderPlus size={16} />Track a folder manually</button>
+      <button class="btn" on:click={trackFolder}><FolderPlus size={16} />手动跟踪文件夹</button>
     </div>
-    <p class="welcome-hint">Then open <strong>Devices</strong> to pair another PC or Steam Deck, or <strong>Cloud Backup</strong> to mirror snapshots online.</p>
+    <p class="welcome-hint">然后打开<strong>设备</strong>页面配对另一台 PC 或 Steam Deck，或使用<strong>云备份</strong>在线镜像快照。</p>
   </div>
 {:else}
   {#if showGuide}

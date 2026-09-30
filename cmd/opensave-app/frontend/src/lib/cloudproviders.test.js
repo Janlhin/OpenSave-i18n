@@ -21,16 +21,16 @@ describe('providerStatus', () => {
     expect(providerStatus('google_drive', 'google_drive', cfg)).toBe('me@example.com');
   });
   it('says Connected when the provider would not reveal an address', () => {
-    expect(providerStatus('dropbox', 'dropbox', { provider: 'dropbox', tokens: { userEmail: 'dropbox-user' } })).toBe('Connected');
+    expect(providerStatus('dropbox', 'dropbox', { provider: 'dropbox', tokens: { userEmail: 'dropbox-user' } })).toBe('已连接');
   });
   it('invites a sign-in on the other OAuth cards', () => {
-    expect(providerStatus('onedrive', 'google_drive', cfg)).toBe('Click to sign in');
+    expect(providerStatus('onedrive', 'google_drive', cfg)).toBe('点击登录');
   });
   it('says Configured only for the selected non-OAuth provider with a destination', () => {
     const local = { provider: 'local', url: 'D:\Backups' };
-    expect(providerStatus('local', null, local)).toBe('Configured');
-    expect(providerStatus('webdav', null, local)).toBe('Not configured');
-    expect(providerStatus('local', null, { provider: 'local', url: '' })).toBe('Not configured');
+    expect(providerStatus('local', null, local)).toBe('已配置');
+    expect(providerStatus('webdav', null, local)).toBe('未配置');
+    expect(providerStatus('local', null, { provider: 'local', url: '' })).toBe('未配置');
   });
   it('says nothing before the settings load', () => {
     expect(providerStatus('local', null, null)).toBe('');

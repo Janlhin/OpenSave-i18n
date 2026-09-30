@@ -49,9 +49,9 @@
   async function copyShown() {
     try {
       await navigator.clipboard.writeText(asText(shown));
-      toast(`Copied ${shown.length} ${shown.length === 1 ? 'entry' : 'entries'}`, 'success');
+      toast(`已复制 ${shown.length} 条记录`, 'success');
     } catch (e) {
-      toast(`Could not copy: ${e.message}`, 'error');
+      toast(`复制失败：${e.message}`, 'error');
     }
   }
 
@@ -68,26 +68,26 @@
 
 <div class="head">
   <div class="title-row">
-    <h2 class="page-title">Activity</h2>
-    <div class="segmented" role="tablist" aria-label="Activity view" use:slidingIndicator={{ mode: 'fill' }}>
-      <button role="tab" aria-selected={view === 'timeline'} class:on={view === 'timeline'} on:click={() => (view = 'timeline')}>Timeline</button>
-      <button role="tab" aria-selected={view === 'log'} class:on={view === 'log'} on:click={() => (view = 'log')}>Log</button>
+    <h2 class="page-title">活动</h2>
+    <div class="segmented" role="tablist" aria-label="活动视图" use:slidingIndicator={{ mode: 'fill' }}>
+      <button role="tab" aria-selected={view === 'timeline'} class:on={view === 'timeline'} on:click={() => (view = 'timeline')}>时间线</button>
+      <button role="tab" aria-selected={view === 'log'} class:on={view === 'log'} on:click={() => (view = 'log')}>日志</button>
     </div>
   </div>
   {#if view === 'log'}
   <div class="controls">
     <FilterTabs
-      options={[['highlights', 'Highlights'], ['all', 'Everything'], ['problems', 'Problems']]}
+      options={[['highlights', '重要'], ['all', '全部'], ['problems', '问题']]}
       counts={{ problems: problemCount }}
       bind:value={show}
     />
-    <SearchInput placeholder="Search activity…" bind:value={query} />
-    <label class="toggle" title="Every entry exactly as logged, oldest first — what a bug report wants">
+    <SearchInput placeholder="搜索活动…" bind:value={query} />
+    <label class="toggle" title="每条记录都按原始日志显示，从旧到新——适合提交错误报告">
       <input type="checkbox" bind:checked={technical} />
-      Technical log
+      技术日志
     </label>
-    <button class="btn small" disabled={shown.length === 0} on:click={copyShown} title="Copy what is shown, for a bug report">
-      Copy
+    <button class="btn small" disabled={shown.length === 0} on:click={copyShown} title="复制当前显示的内容，用于错误报告">
+      复制
     </button>
   </div>
   {/if}
@@ -96,10 +96,10 @@
 {#if view === 'timeline'}
   <Timeline />
 {:else if $logEntries.length === 0}
-  <div class="card"><div class="empty"><h3>Nothing yet</h3><p>Syncs, snapshots and anything that needs your attention show up here.</p></div></div>
+  <div class="card"><div class="empty"><h3>暂无内容</h3><p>同步、快照以及任何需要你关注的内容都会显示在这里。</p></div></div>
 {:else if shown.length === 0}
-  <div class="card"><div class="empty"><h3>Nothing matches</h3><p>
-        {#if query}Try another search.{:else if show === 'problems'}No warnings or errors — all quiet.{:else}Nothing but routine so far — <button class="linklike" on:click={() => (show = 'all')}>show everything</button>.{/if}
+  <div class="card"><div class="empty"><h3>没有匹配结果</h3><p>
+        {#if query}换个搜索词试试。{:else if show === 'problems'}没有警告或错误——一切正常。{:else}目前只有日常记录——<button class="linklike" on:click={() => (show = 'all')}>显示全部</button>。{/if}
       </p></div></div>
 {:else if technical}
   <div class="card log" use:autoscroll={shown.length}>

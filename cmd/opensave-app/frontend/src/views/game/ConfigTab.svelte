@@ -43,7 +43,7 @@
   async function save() {
     const appId = (cfg.appId ?? '').trim();
     if (appId !== '' && !/^\d+$/.test(appId)) {
-      appIdError = 'A Steam App ID is digits only — the number in the store URL.';
+      appIdError = 'Steam App ID 只能是数字 — 即商店网址中的那串数字。';
       return;
     }
     appIdError = '';
@@ -55,15 +55,15 @@
     const savePath = savePathChange(game.savePath, cfg.savePath);
     if (savePath) {
       const ok = await askConfirm(
-        `Track “${game.name}” at ${savePath} from now on?\n\n` +
-          `Files in the old folder are left exactly where they are, but they stop syncing ` +
-          `and stop being snapshotted. Existing snapshots are kept and still restore.`,
-        { title: 'Move tracking to a new folder?', confirmText: 'Move tracking' }
+        `以后在 ${savePath} 跟踪“${game.name}”？\n\n` +
+          `旧文件夹中的文件会原样保留，但它们不再同步、也不再生成快照。` +
+          `已有的快照会保留，仍可恢复。`,
+        { title: '将跟踪移动到新文件夹？', confirmText: '移动跟踪' }
       );
       if (!ok) return;
     }
 
-    await run('Configuration saved', () =>
+    await run('配置已保存', () =>
       api.patch(`/api/games/${game.id}`, {
         appId,
         // Omitted unless it actually changed: the PATCH decodes into the
@@ -82,12 +82,12 @@
   }
 
   async function browseSavePath() {
-    const dir = await native.selectDirectory(`Save folder for “${game.name}”`);
+    const dir = await native.selectDirectory(`“${game.name}”的存档文件夹`);
     if (dir) cfg.savePath = dir;
   }
 
   async function browseExe() {
-    const file = await native.selectFile('Select the game executable');
+    const file = await native.selectFile('选择游戏可执行文件');
     if (file) cfg.exePath = file;
   }
 </script>
@@ -101,69 +101,66 @@
     {/if}
   </div>
   <div class="fields">
-    <h3>Launch &amp; sync configuration</h3>
+    <h3>启动与同步配置</h3>
     <div class="field">
-      <label for="c-savepath">Save folder</label>
+      <label for="c-savepath">存档文件夹</label>
       <div class="path-row">
-        <input id="c-savepath" placeholder="Folder holding this game's saves" bind:value={cfg.savePath} />
-        <button class="btn" on:click={browseSavePath}>Browse</button>
+        <input id="c-savepath" placeholder="存放此游戏存档的文件夹" bind:value={cfg.savePath} />
+        <button class="btn" on:click={browseSavePath}>浏览</button>
       </div>
       <span class="hint">
-        The folder OpenSave treats as this game's save.
+        OpenSave 视为此游戏存档的文件夹。
         <MoreInfo>
-          Files sync by their position <em>inside</em> this folder, so each device can point at
-          a different path and still end up with the same files — useful when a game keeps saves
-          in a per-account folder named after your Steam or Epic ID, which differs on every
-          machine. Point each device at its own such folder and saves land where that copy of
-          the game looks for them.
+          文件按其在该文件夹<em>内部</em>的位置同步，因此每台设备可以指向不同路径，最终仍得到相同的文件 —
+          当游戏把存档放在以你的 Steam 或 Epic ID 命名、且每台机器都不同的账号文件夹里时尤其有用。
+          让每台设备指向各自的此类文件夹，存档就会落到该副本游戏查找它们的位置。
         </MoreInfo>
       </span>
       {#if savePathChange(game.savePath, cfg.savePath)}
         <span class="hint hint-warn">
-          Not saved yet. The old folder keeps its files but stops syncing and being
-          snapshotted.
+          尚未保存。旧文件夹中的文件仍在，但不再同步、也不再生成快照。
         </span>
       {/if}
     </div>
     <AppIdField bind:value={cfg.appId} error={appIdError} />
     <div class="field">
-      <label for="c-exe">Executable path</label>
+      <label for="c-exe">可执行文件路径</label>
       <div class="path-row">
-        <input id="c-exe" placeholder="Browse to the game .exe" bind:value={cfg.exePath} />
-        <button class="btn" on:click={browseExe}>Browse</button>
+        <input id="c-exe" placeholder="浏览选择游戏的 .exe" bind:value={cfg.exePath} />
+        <button class="btn" on:click={browseExe}>浏览</button>
       </div>
       <span class="hint">
-        Launch starts this, even for a Steam game. Leave it empty to launch through Steam.
+        启动时运行此程序，Steam 游戏也不例外。留空则通过 Steam 启动。
       </span>
     </div>
     <div class="field">
-      <label for="c-cover">Custom cover image URL</label>
-      <input id="c-cover" placeholder="https://…  (great for emulator games)" bind:value={cfg.coverUrl} />
-      <span class="hint">Leave blank to auto-use Steam art from the App ID. Paste any image URL for emulators.</span>
+      <label for="c-cover">自定义封面图 URL</label>
+      <input id="c-cover" placeholder="https://…  （模拟器游戏很好用）" bind:value={cfg.coverUrl} />
+      <span class="hint">留空则根据 App ID 自动使用 Steam 封面图。模拟器游戏可粘贴任意图片 URL。</span>
     </div>
     <label class="check">
       <input type="checkbox" bind:checked={cfg.autoSync} />
-      Auto-sync saves when changes are detected
+      检测到变化时自动同步存档
     </label>
     <div class="field" style="margin-top: 12px;">
-      <label for="c-max">Automatic snapshot limit</label>
+      <label for="c-max">自动快照上限</label>
       <input id="c-max" type="number" min="0" bind:value={cfg.maxSnapshots} />
       <span class="hint">
-        Max <em>automatic</em> snapshots kept per branch (0 = unlimited). Oldest are pruned first.
+        每个分支保留的<em>自动</em>快照数量上限（0 = 不限制）。最旧的先被清理。
       </span>
     </div>
     <div class="field">
-      <label for="c-max-manual">Manual snapshot limit</label>
+      <label for="c-max-manual">手动快照上限</label>
       <input id="c-max-manual" type="number" min="0" bind:value={cfg.maxManualSnapshots} />
       <span class="hint">
-        Snapshots you took yourself get their own budget, so a game that auto-saves often
-        can't push them out. <strong>0 = keep forever</strong> (the default).
+        你手动拍摄的快照有独立的配额，因此频繁自动存档的游戏不会把它们挤掉。
+        <strong>0 = 永久保留</strong>（默认值）。
       </span>
     </div>
     <SyncIgnoreEditor {game} bind:value={cfg.syncIgnore} severalFolders={locations.length > 0} />
     <SaveLocations {game} {runner} bind:locations />
     <div class="save">
-      <button class="btn primary" disabled={$busy} on:click={save}>Save configuration</button>
+      <button class="btn primary" disabled={$busy} on:click={save}>保存配置</button>
     </div>
   </div>
 </div>

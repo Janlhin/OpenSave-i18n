@@ -24,11 +24,11 @@
   $: if ($gameList) load();
 
   async function place(offer) {
-    const dir = await native.selectDirectory(`Folder for "${offer.name}" on this device`);
+    const dir = await native.selectDirectory(`“${offer.name}”在此设备上的文件夹`);
     if (!dir) return;
     try {
       await api.post(`/api/offered-games/${offer.gameId}/place`, { path: dir });
-      toast(`${offer.name} is now tracked here`, 'success');
+      toast(`现在开始跟踪 ${offer.name}`, 'success');
       await load();
     } catch (e) {
       toast(e.message, 'error');
@@ -37,7 +37,7 @@
 
   function decline(offer) {
     withUndo({
-      message: `You won't be asked about ${offer.name} again. Tracking it yourself later still works.`,
+      message: `不会再询问关于 ${offer.name} 的事。之后仍可自行跟踪它。`,
       keys: [`offer:${offer.gameId}`],
       stillThere: () => offeredGames.some((o) => o.gameId === offer.gameId),
       run: async () => {
@@ -51,23 +51,22 @@
 
 {#if shownOffers.length > 0}
   <div class="card offers">
-    <h3>Waiting for a folder</h3>
+    <h3>等待指定文件夹</h3>
     <p class="intro">
-      {shownOffers.length === 1 ? 'Another device syncs this game' : 'Other devices sync these games'},
-      but this one doesn't know where to keep
-      {shownOffers.length === 1 ? 'it' : 'them'} yet. Nothing syncs until you choose.
+      {shownOffers.length === 1 ? '另一台设备正在同步这个游戏' : '其他设备正在同步这些游戏'}，
+      但这台设备还不知道把它们放在哪里。在你做出选择之前不会同步任何内容。
     </p>
     {#each shownOffers as offer (offer.gameId + offer.peerId)}
       <div class="row">
         <div class="info">
           <strong>{offer.name}</strong>
           <span class="hint">
-            Kept at <code>{offer.peerPath}</code> on the other device.
+            在另一台设备上位于 <code>{offer.peerPath}</code>。
           </span>
         </div>
         <div class="actions">
-          <button class="btn primary" on:click={() => place(offer)}>Choose folder…</button>
-          <button class="btn" on:click={() => decline(offer)}>Decline</button>
+          <button class="btn primary" on:click={() => place(offer)}>选择文件夹…</button>
+          <button class="btn" on:click={() => decline(offer)}>拒绝</button>
         </div>
       </div>
     {/each}

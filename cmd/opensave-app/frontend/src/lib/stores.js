@@ -63,7 +63,7 @@ setInterval(() => {
       if (entry.state === 'running' && age > SYNC_STALE_MS) {
         delete copy[gameId];
         changed = true;
-        toast(`Sync of ${get(games)[gameId]?.name ?? 'a game'} stalled — it will retry automatically`, 'error');
+        toast(`${get(games)[gameId]?.name ?? '某个游戏'} 的同步已停滞——将自动重试`, 'error');
       } else if ((entry.state === 'error' || entry.state === 'done') && age > SYNC_ERROR_LINGER_MS) {
         delete copy[gameId];
         changed = true;
@@ -101,10 +101,10 @@ export const confirmRequest = writable(null); // {title, message, confirmText, c
 export function askConfirm(message, opts = {}) {
   return new Promise((resolve) => {
     confirmRequest.set({
-      title: opts.title ?? 'Are you sure?',
+      title: opts.title ?? '确定吗？',
       message,
-      confirmText: opts.confirmText ?? 'Confirm',
-      cancelText: opts.cancelText ?? 'Cancel',
+      confirmText: opts.confirmText ?? '确认',
+      cancelText: opts.cancelText ?? '取消',
       danger: opts.danger ?? false,
       resolve
     });
@@ -136,11 +136,11 @@ function friendlySyncError(raw) {
   if (!raw) return '';
   const m = String(raw).toLowerCase();
   if (m.includes('no space') || m.includes('not enough space') || m.includes('enospc') || m.includes('disk full'))
-    return 'not enough free storage to save the incoming files';
+    return '没有足够的可用存储空间来保存传入的文件';
   if (m.includes('permission') || m.includes('access is denied') || m.includes('eacces'))
-    return 'the save folder is read-only or locked by another program';
+    return '存档文件夹为只读或被其他程序占用';
   if (m.includes('timeout') || m.includes('connection') || m.includes('reset') || m.includes('eof') || m.includes('refused'))
-    return 'the connection to the other device dropped';
+    return '与另一台设备的连接已断开';
   // Unknown error: show it, trimmed to something readable.
   return String(raw).slice(0, 160);
 }
@@ -191,10 +191,10 @@ export function applyMessage(msg) {
       // device had and this device had not changed since. Said out loud all
       // the same: a save that changes by itself should say who changed it.
       if (get(notifyPrefs).cloudPulled) {
-        toast(`Brought ${data.deviceName}'s newer save for “${data.gameName}” from the cloud`, 'success');
+        toast(`已从云端取来 ${data.deviceName} 的“${data.gameName}”较新存档`, 'success');
         toDesktop('cloudPulled', {
           title: data.gameName,
-          body: `Brought ${data.deviceName}'s newer save from the cloud`,
+          body: `已从云端取来 ${data.deviceName} 的较新存档`,
           game: get(games)[data.gameId]
         });
       }
@@ -207,7 +207,7 @@ export function applyMessage(msg) {
       activityTick.update((n) => n + 1);
       const said = get(notifyPrefs).arrivals ? arrivalMessage(data, get(games), arrivalShown) : null;
       if (said) {
-        toast(said, 'info', { action: { label: 'Open', run: () => navigate('game', { gameId: data.gameId }) } });
+        toast(said, 'info', { action: { label: '打开', run: () => navigate('game', { gameId: data.gameId }) } });
         toDesktop('arrivals', arrivalNote(data, get(games)));
       }
       break;
@@ -238,7 +238,7 @@ export function applyMessage(msg) {
       break;
     case 'sync-error': {
       syncActivity.update((s) => ({ ...s, [data.gameId]: { state: 'error', at: Date.now(), ...data.data } }));
-      const gameName = get(games)[data.gameId]?.name ?? 'a game';
+      const gameName = get(games)[data.gameId]?.name ?? '某个游戏';
       const reason = friendlySyncError(data.data?.error);
       // Every failed sync is queued for automatic retry — reassure the user
       // they don't need to manually re-sync. The retry loop re-fails every
@@ -246,24 +246,24 @@ export function applyMessage(msg) {
       const now = Date.now();
       if (now - (lastSyncErrorToast[data.gameId] ?? 0) > 60_000) {
         lastSyncErrorToast[data.gameId] = now;
-        toast(`Sync failed for “${gameName}”${reason ? ' — ' + reason : ''}. OpenSave will retry automatically.`, 'error');
+        toast(`“${gameName}”同步失败${reason ? '——' + reason : ''}。OpenSave 将自动重试。`, 'error');
       }
       break;
     }
     case 'conflict-resolved': {
-      const gameName = get(games)[data.gameId]?.name ?? 'a game';
+      const gameName = get(games)[data.gameId]?.name ?? '某个游戏';
       if (data.error) {
         toast(
-          `Couldn't apply your choice for “${gameName}” — ${friendlySyncError(data.error)}. The conflict is still open.`,
+          `无法应用你对“${gameName}”的选择——${friendlySyncError(data.error)}。冲突仍未解决。`,
           'error'
         );
       } else {
         toast(
           data.resolution === 'merge-branch'
-            ? `Both versions kept for “${gameName}” — you carry on with yours, and the other device's is on branch "${data.branchName}"`
+            ? `“${gameName}”的两个版本都已保留——你继续使用自己的版本，另一台设备的版本在分支“${data.branchName}”上`
             : data.resolution === 'keep-remote'
-              ? `Now using the other device's version of “${gameName}” — yours is snapshotted if you change your mind`
-              : `Kept this device's version of “${gameName}”`,
+              ? `“${gameName}”已改用另一台设备的版本——如你反悔，已为你的版本建立快照`
+              : `已保留本设备的“${gameName}”版本`,
           'success'
         );
       }
@@ -275,17 +275,17 @@ export function applyMessage(msg) {
       // outcome arrives here rather than at the click. A failure has to be
       // said out loud: the folder stays out of sync until it is answered, and
       // a silent failure looks exactly like a silent success.
-      const name = get(games)[data.gameId]?.name ?? 'a game';
+      const name = get(games)[data.gameId]?.name ?? '某个游戏';
       if (data.error) {
         toast(
-          `Couldn't apply your choice for the “${data.root}” folder of “${name}” — ${friendlySyncError(data.error)}. It's still waiting.`,
+          `无法应用你对“${name}”的“${data.root}”文件夹的选择——${friendlySyncError(data.error)}。它仍在等待处理。`,
           'error'
         );
       } else {
         toast(
           data.resolution === 'keep-remote'
-            ? `Now using the other device's “${data.root}” folder for “${name}” — yours is snapshotted if you change your mind`
-            : `Kept this device's “${data.root}” folder for “${name}”`,
+            ? `“${name}”的“${data.root}”文件夹已改用另一台设备的版本——如你反悔，已为你的版本建立快照`
+            : `已保留本设备的“${name}”的“${data.root}”文件夹`,
           'success'
         );
       }
@@ -303,7 +303,7 @@ export function applyMessage(msg) {
     case 'app-update':
       appUpdate.set(data ?? null);
       if (data?.state === 'error') {
-        toast(`Update failed — ${data.error}. Nothing was changed; you're still on the current version.`, 'error');
+        toast(`更新失败——${data.error}。未做任何更改；你仍处于当前版本。`, 'error');
         setTimeout(() => appUpdate.set(null), 500);
       }
       break;
@@ -334,7 +334,7 @@ function applyPeersPayload(data, isInit = false) {
     // initial state dump at app launch (already-connected is not news).
     const connected = !!room?.connected;
     if (connected && !wasWanConnected && !isInit) {
-      toast(`Connected to relay room “${room.roomCode}”`, 'success');
+      toast(`已连接到中继房间“${room.roomCode}”`, 'success');
     }
     wasWanConnected = connected;
   }

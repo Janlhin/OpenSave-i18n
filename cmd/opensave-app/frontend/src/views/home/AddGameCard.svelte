@@ -45,7 +45,7 @@
   onMount(() => nameInput?.focus());
 
   async function pickFolder() {
-    const dir = await native.selectDirectory('Choose the save folder to track');
+    const dir = await native.selectDirectory('选择要跟踪的存档文件夹');
     if (dir) {
       typed = false;
       path = dir;
@@ -53,7 +53,7 @@
   }
 
   async function pickFile() {
-    const file = await native.selectFile('Choose the save file to track');
+    const file = await native.selectFile('选择要跟踪的存档文件');
     if (file) {
       typed = false;
       path = file;
@@ -65,7 +65,7 @@
     adding = true;
     try {
       const game = await api.post('/api/games', { name: name.trim(), savePath: path });
-      toast(`Now tracking "${game.name ?? name}"`, 'success');
+      toast(`正在跟踪“${game.name ?? name}”`, 'success');
       dispatch('close');
       navigate('game', { gameId: game.id });
     } catch (e) {
@@ -76,39 +76,39 @@
   }
 </script>
 
-<Modal title="Track a game" icon={FolderPlus} width={560} height="auto" onClose={() => dispatch('close')}>
+<Modal title="跟踪游戏" icon={FolderPlus} width={560} height="auto" onClose={() => dispatch('close')}>
   <div class="body">
     <div class="field">
-      <span class="label">Save folder or file</span>
+      <span class="label">存档文件夹或文件</span>
       {#if canPick}
         <div class="picked" title={path}><bdi>{path}</bdi></div>
         <div class="alt">
-          <button class="linklike" on:click={pickFolder}>Change folder…</button>
-          <button class="linklike" on:click={pickFile}>Track a single file instead…</button>
+          <button class="linklike" on:click={pickFolder}>更换文件夹…</button>
+          <button class="linklike" on:click={pickFile}>改为跟踪单个文件…</button>
         </div>
       {:else}
         <input id="g-path" placeholder="C:\Users\you\AppData\…" bind:value={path} />
       {/if}
     </div>
     <div class="field">
-      <label for="g-name">Name</label>
+      <label for="g-name">名称</label>
       <input
         id="g-name"
         bind:this={nameInput}
-        placeholder="e.g. Elden Ring"
+        placeholder="例如 Elden Ring"
         bind:value={name}
         on:input={() => (typed = true)}
         on:keydown={(e) => e.key === 'Enter' && add()}
       />
-      <span class="hint">How it shows in your library, and on your other devices.</span>
+      <span class="hint">它在库中的显示方式，以及在其他设备上的显示方式。</span>
     </div>
   </div>
   <ModalFoot>
     <span />
     <div class="actions">
-      <button class="btn" on:click={() => dispatch('close')}>Cancel</button>
+      <button class="btn" on:click={() => dispatch('close')}>取消</button>
       <button class="btn primary" disabled={!name.trim() || !path || adding} on:click={add}>
-        {adding ? 'Adding…' : 'Start tracking'}
+        {adding ? '正在添加…' : '开始跟踪'}
       </button>
     </div>
   </ModalFoot>

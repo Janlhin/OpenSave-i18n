@@ -61,7 +61,7 @@
     try {
       settings.set(await api.post('/api/settings', { cloudSync: config }));
       savedConfig = structuredClone(config);
-      toast('Cloud provider saved', 'success');
+      toast('云服务商已保存', 'success');
     } catch (e) {
       toast(e.message, 'error');
     } finally {
@@ -82,7 +82,7 @@
       } catch (e) {
         undo();
         switchState = null;
-        toast(`Couldn't save that: ${e.message}`, 'error');
+        toast(`无法保存：${e.message}`, 'error');
       }
     });
   }
@@ -104,13 +104,13 @@
   let importSource = '';
 
   async function pickImportFile() {
-    const src = await native.selectBackupFile('Select an .sscb backup to import');
+    const src = await native.selectBackupFile('选择要导入的 .sscb 备份文件');
     if (src) importSource = src;
   }
 </script>
 
 <div class="head">
-  <h2 class="page-title">Cloud Backup</h2>
+  <h2 class="page-title">云备份</h2>
 </div>
 
 {#if !config}
@@ -130,19 +130,18 @@
 
     {#if config.provider === 'google_drive'}
       <div class="field folder-id">
-        <label for="cb-driveid">Drive folder ID (optional)</label>
-        <input id="cb-driveid" bind:value={config.folderId} placeholder="Leave blank to use the OpenSave folder it creates" />
+        <label for="cb-driveid">Drive 文件夹 ID（可选）</label>
+        <input id="cb-driveid" bind:value={config.folderId} placeholder="留空则使用其自动创建的 OpenSave 文件夹" />
         <span class="hint">
-          Only to keep snapshots in a particular existing Drive folder — the ID is the long code in
-          the folder's address.
+          仅用于将快照保存到某个已有的特定 Drive 文件夹——ID 就是该文件夹地址中的那串长代码。
         </span>
       </div>
     {/if}
 
     {#if providerDirty}
       <div class="actions">
-        <span class="unsaved">Not saved yet — backups still go to the provider saved before.</span>
-        <button class="btn primary" disabled={$busy} on:click={save}>Save provider</button>
+        <span class="unsaved">尚未保存——备份仍会发送到之前保存的服务商。</span>
+        <button class="btn primary" disabled={$busy} on:click={save}>保存服务商</button>
       </div>
     {/if}
 
@@ -151,56 +150,54 @@
          it goes. These save as they are switched. -->
     <div class="auto">
       <h4>
-        Automatically
+        自动
         <span class="switch-state" aria-live="polite">
-          {#if switchState === 'saving'}Saving…{:else if switchState === 'saved'}Saved{/if}
+          {#if switchState === 'saving'}保存中…{:else if switchState === 'saved'}已保存{/if}
         </span>
       </h4>
       <label class="check">
         <input type="checkbox" checked={config.enabled} on:change={(e) => setBackupAll(e.currentTarget.checked)} />
-        Back up every new snapshot to the cloud
+        将每个新快照备份到云端
       </label>
       <p class="hint">
-        Uploads begin once a provider is set up above. Snapshots are kept in an
-        <strong>OpenSave</strong> folder there.
+        在上方设置好服务商后即开始上传。快照会保存在那里的
+        <strong>OpenSave</strong> 文件夹中。
       </p>
       <label class="check">
         <input type="checkbox" checked={autoPull} on:change={(e) => setAutoPull(e.currentTarget.checked)} />
-        Bring newer saves from my other devices
+        从我的其他设备拉取较新的存档
       </label>
       <p class="hint">
-        When another device's backup carries on from the save this one has, and this one hasn't
-        changed since, it's put in place without asking — the way syncing between your devices
-        works. Anything else is asked about first, and this device's save is kept as a snapshot
-        either way.
+        当其他设备的备份正好接续本机当前的存档，且本机存档此后没有变化时，会直接应用而不再询问——这就是
+        设备间同步的工作方式。其他情况都会先询问，且无论哪种情况，本机存档都会保留为快照。
       </p>
     </div>
 
   </div>
 
-  <h3 class="section">Cloud snapshots</h3>
+  <h3 class="section">云端快照</h3>
   <div class="card entry">
     <div>
-      <h3>Browse your cloud library</h3>
+      <h3>浏览你的云端库</h3>
       <p class="quiet">
-        Every game with snapshots in the cloud, as cover-art tiles — upload, restore, or delete per game.
+        以封面卡片形式列出云端有快照的所有游戏——可按游戏上传、恢复或删除。
       </p>
     </div>
-    <button class="btn primary" on:click={() => (browserOpen = true)}><Cloud size={16} />Browse cloud</button>
+    <button class="btn primary" on:click={() => (browserOpen = true)}><Cloud size={16} />浏览云端</button>
   </div>
 
-  <h3 class="section">Backup file (.sscb)</h3>
+  <h3 class="section">备份文件（.sscb）</h3>
   <div class="card entry">
     <div>
-      <h3>Export / import saves</h3>
+      <h3>导出 / 导入存档</h3>
       <p class="quiet">
-        Pick any saves on this machine — tracked or just detected — and export them with their
-        locations into one file. Import adds them to snapshots, or fully restores them onto disk.
+        选择本机上的任意存档——无论已跟踪还是刚检测到的——将其连同路径一并导出为一个文件。
+        导入可将它们加入快照，或完整还原到磁盘。
       </p>
     </div>
     <div class="entry-actions">
-      <button class="btn" disabled={$busy} on:click={pickImportFile}>Import .sscb</button>
-      <button class="btn primary" disabled={$busy} on:click={() => (exportOpen = true)}>Export saves…</button>
+      <button class="btn" disabled={$busy} on:click={pickImportFile}>导入 .sscb</button>
+      <button class="btn primary" disabled={$busy} on:click={() => (exportOpen = true)}>导出存档…</button>
     </div>
   </div>
 {/if}

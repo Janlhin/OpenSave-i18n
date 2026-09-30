@@ -42,7 +42,7 @@
   $: pending = ($locationConflicts ?? []).filter((c) => !applying.has(keyOf(c)) && !later.has(keyOf(c)));
   $: current = pending[0]; // one at a time, like the whole-game screen
   $: gameName = current ? ($games[current.gameId]?.name ?? current.gameId) : '';
-  $: peerName = current ? (current.peer?.name ?? current.peer?.Name ?? 'the other device') : '';
+  $: peerName = current ? (current.peer?.name ?? current.peer?.Name ?? '对方设备') : '';
   $: peerType = current ? $peers[current.peer?.id ?? current.peer?.ID]?.deviceType : '';
   $: localIcon = isHandheld($settings?.deviceType) ? Gamepad2 : Monitor;
   $: peerIcon = isHandheld(peerType) ? Gamepad2 : Monitor;
@@ -54,9 +54,9 @@
     const fresh = list.filter((c) => !seen.has(keyOf(c)));
     if (fresh.length > 0) {
       const game = $games[fresh[0].gameId];
-      const name = game?.name ?? 'a game';
-      demandAttention('conflicts', { title: name, body: `Its “${fresh[0].root}” folder differs on both devices — choose which to keep.`, game });
-      toast(`The “${fresh[0].root}” folder of “${name}” differs on both devices`, 'error');
+      const name = game?.name ?? '某个游戏';
+      demandAttention('conflicts', { title: name, body: `两台设备上的“${fresh[0].root}”文件夹存在差异——请选择要保留的版本。`, game });
+      toast(`“${name}”的“${fresh[0].root}”文件夹在两台设备上存在差异`, 'error');
     }
     seen = new Set(list.map(keyOf));
     // Forget in-flight markers for conflicts that are gone.
@@ -83,7 +83,7 @@
       });
       applying = new Set(applying).add(keyOf(c));
       if (resolution === 'keep-remote') {
-        toast(`Bringing ${peerName}'s “${c.root}” folder over…`, 'info');
+        toast(`正在获取 ${peerName} 的“${c.root}”文件夹…`, 'info');
       }
       showDiff = false;
     } catch (e) {
@@ -93,12 +93,12 @@
     }
   }
 
-  const fmtMs = (ms) => (ms ? new Date(ms).toLocaleString() : 'unknown');
+  const fmtMs = (ms) => (ms ? new Date(ms).toLocaleString() : '未知');
   const fmtSize = (n) =>
     n < 0 ? '—' : n >= 1048576 ? (n / 1048576).toFixed(1) + ' MB' : n >= 1024 ? (n / 1024).toFixed(1) + ' KB' : n + ' B';
   const diffIcon = (s) => (s === 'changed' ? '✱' : s === 'only-remote' ? '+' : '−');
   const diffLabel = (s) =>
-    s === 'changed' ? 'differs' : s === 'only-remote' ? `only on ${peerName}` : 'only on this device';
+    s === 'changed' ? '有差异' : s === 'only-remote' ? `仅存在于 ${peerName}` : '仅存在于本机';
 
   $: localMs = current?.localStats?.latestMtimeMs ?? 0;
   $: remoteMs = current?.remoteStats?.latestMtimeMs ?? 0;
@@ -111,9 +111,9 @@
 
   function sideSummary(stats) {
     const files = stats?.files;
-    if (files === 0) return 'folder is empty';
+    if (files === 0) return '文件夹为空';
     if (typeof files !== 'number') return '';
-    return `whole folder: ${files} file${files === 1 ? '' : 's'} · ${fmtSize(stats?.totalBytes ?? -1)}`;
+    return `整个文件夹：${files} 个文件 · ${fmtSize(stats?.totalBytes ?? -1)}`;
   }
 </script>
 
@@ -122,49 +122,46 @@
 {#if current}
   <div class="overlay" out:dialogOut|global>
     <div class="modal card">
-      <h3 class="with-icon"><FolderOpen size={20} /> “{current.root}” folder — {gameName}</h3>
+      <h3 class="with-icon"><FolderOpen size={20} /> “{current.root}”文件夹 — {gameName}</h3>
       <p class="desc">
-        This is one of {gameName}'s extra save folders, and it changed on both this device and
-        <strong>{peerName}</strong>. The game's main save is unaffected and keeps syncing; only this
-        folder is waiting on you.
+        这是 {gameName} 的额外存档文件夹之一，本机与 <strong>{peerName}</strong> 都更改了它。游戏的主存档不受影响、继续同步；
+        只有这个文件夹在等待你处理。
       </p>
 
       <div class="versions">
         <div class="version" class:newer={newerSide === 'local'}>
           <div class="v-head">
-            <span class="v-title with-icon"><svelte:component this={localIcon} size={16} /> This device</span>
-            {#if newerSide === 'local'}<span class="v-badge">changed more recently</span>{/if}
+            <span class="v-title with-icon"><svelte:component this={localIcon} size={16} /> 本机</span>
+            {#if newerSide === 'local'}<span class="v-badge">最近更改过</span>{/if}
           </div>
           <div class="v-diff">
-            <strong>{changedCount + onlyLocalCount}</strong>
-            file{changedCount + onlyLocalCount === 1 ? '' : 's'} differ{changedCount + onlyLocalCount === 1 ? 's' : ''} here
+            此处有 <strong>{changedCount + onlyLocalCount}</strong> 个文件存在差异
           </div>
           {#if onlyLocalCount > 0}
-            <div class="v-only">{onlyLocalCount} only on this device</div>
+            <div class="v-only">{onlyLocalCount} 个文件仅存在于本机</div>
           {/if}
           <div class="v-stats">{sideSummary(current.localStats)}</div>
-          <div class="v-time">last change {fmtMs(localMs)}</div>
+          <div class="v-time">最后更改 {fmtMs(localMs)}</div>
         </div>
         <div class="version" class:newer={newerSide === 'remote'}>
           <div class="v-head">
             <span class="v-title with-icon"><svelte:component this={peerIcon} size={16} /> {peerName}</span>
-            {#if newerSide === 'remote'}<span class="v-badge">changed more recently</span>{/if}
+            {#if newerSide === 'remote'}<span class="v-badge">最近更改过</span>{/if}
           </div>
           <div class="v-diff">
-            <strong>{changedCount + onlyRemoteCount}</strong>
-            file{changedCount + onlyRemoteCount === 1 ? '' : 's'} differ{changedCount + onlyRemoteCount === 1 ? 's' : ''} there
+            对方有 <strong>{changedCount + onlyRemoteCount}</strong> 个文件存在差异
           </div>
           {#if onlyRemoteCount > 0}
-            <div class="v-only">{onlyRemoteCount} only on {peerName}</div>
+            <div class="v-only">{onlyRemoteCount} 个文件仅存在于 {peerName}</div>
           {/if}
           <div class="v-stats">{sideSummary(current.remoteStats)}</div>
-          <div class="v-time">last change {fmtMs(remoteMs)}</div>
+          <div class="v-time">最后更改 {fmtMs(remoteMs)}</div>
         </div>
       </div>
 
       {#if current.diffTotal > 0}
         <button class="diff-toggle" on:click={() => (showDiff = !showDiff)}>
-          <Chevron open={showDiff} /> What's different ({current.diffTotal} file{current.diffTotal === 1 ? '' : 's'})
+          <Chevron open={showDiff} /> 差异详情（{current.diffTotal} 个文件）
         </button>
         {#if showDiff}
           <div class="diff-list">
@@ -176,30 +173,28 @@
               </div>
             {/each}
             {#if current.diffTotal > diffFiles.length}
-              <div class="diff-more">…and {current.diffTotal - diffFiles.length} more</div>
+              <div class="diff-more">…还有 {current.diffTotal - diffFiles.length} 个</div>
             {/if}
           </div>
         {/if}
       {/if}
 
       <div class="actions">
-        <button class="btn ghost later" disabled={busy} on:click={putOff} title="Nothing of this folder syncs until you decide. Open the game to decide.">Decide later</button>
+        <button class="btn ghost later" disabled={busy} on:click={putOff} title="在你决定之前，该文件夹的任何内容都不会同步。打开该游戏页面进行决定。">稍后决定</button>
         <button class="btn" disabled={busy} on:click={() => resolve('keep-remote')}>
-          Use {peerName}'s
+          使用 {peerName} 的
         </button>
         <button class="btn primary" disabled={busy} on:click={() => resolve('keep-local')}>
-          Keep mine
+          保留我的
         </button>
       </div>
       <p class="hint-line">
-        <History size={15} class="inline-icon" /> A snapshot of every one of this game's folders is taken before either choice is applied,
-        so both are undoable from the Snapshots tab. <strong>“Keep mine”</strong> makes this
-        device's copy the shared one and asks {peerName} to take it — {peerName} gets its own say if
-        it has newer work. <strong>“Use {peerName}'s”</strong> brings their copy here.
+        <History size={15} class="inline-icon" /> 在应用任一选择之前，都会先为该游戏的每个文件夹保存快照，
+        因此两种选择都可以在“快照”标签页撤销。<strong>“保留我的”</strong>会把本机的副本设为共享版本并要求 {peerName} 接收——如果
+        {peerName} 有更新的内容，它也有自己的选择权。<strong>“使用 {peerName} 的”</strong>会把对方的副本带到本机。
       </p>
       <p class="hint-line">
-        There is no “keep both” for a folder: that option puts the other copy on a branch, and
-        branches cover the whole game rather than one of its folders.
+        文件夹没有“两者都保留”选项：该选项会把另一份副本放到分支上，而分支覆盖的是整个游戏，而不是某个文件夹。
       </p>
     </div>
   </div>

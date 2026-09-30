@@ -55,10 +55,10 @@ var trayPauseChoices = []struct {
 	label string
 	d     time.Duration
 }{
-	{"For 15 minutes", 15 * time.Minute},
-	{"For 1 hour", time.Hour},
-	{"For 3 hours", 3 * time.Hour},
-	{"Until I resume", 0},
+	{"15 分钟", 15 * time.Minute},
+	{"1 小时", time.Hour},
+	{"3 小时", 3 * time.Hour},
+	{"直到我恢复", 0},
 }
 
 // startTray runs the system tray in its own goroutine.
@@ -71,32 +71,32 @@ func (a *App) startTray() {
 	go systray.Run(func() {
 		systray.SetIcon(trayIconBytes())
 		systray.SetTitle("OpenSave")
-		systray.SetTooltip("OpenSave — game save sync")
+		systray.SetTooltip("OpenSave — 游戏存档同步")
 
-		statusItem := systray.AddMenuItem("Starting…", "Where your saves stand")
+		statusItem := systray.AddMenuItem("正在启动…", "你的存档当前状态")
 		statusItem.Disable()
-		recentMenu := systray.AddMenuItem("Recent activity", "The last few things that happened")
+		recentMenu := systray.AddMenuItem("最近活动", "最近发生的几件事")
 		recentItems := make([]*systray.MenuItem, trayRecentLines)
 		for i := range recentItems {
 			recentItems[i] = recentMenu.AddSubMenuItem("", "")
 			recentItems[i].Disable()
 			recentItems[i].Hide()
 		}
-		activityItem := recentMenu.AddSubMenuItem("Open Activity", "See everything that happened")
+		activityItem := recentMenu.AddSubMenuItem("打开活动页", "查看所有发生的事情")
 		systray.AddSeparator()
 
-		openItem := systray.AddMenuItem("Open OpenSave", "Show the OpenSave window")
-		syncItem := systray.AddMenuItem("Sync all games", "Sync every tracked game now")
-		snapshotItem := systray.AddMenuItem("Snapshot every game now", "Take a snapshot of every tracked game")
-		pauseMenu := systray.AddMenuItem("Pause syncing", "Stop syncing for a while; snapshots are still taken")
+		openItem := systray.AddMenuItem("打开 OpenSave", "显示 OpenSave 窗口")
+		syncItem := systray.AddMenuItem("同步所有游戏", "立即同步所有已跟踪的游戏")
+		snapshotItem := systray.AddMenuItem("立即为所有游戏建立快照", "为所有已跟踪的游戏建立快照")
+		pauseMenu := systray.AddMenuItem("暂停同步", "暂停同步一段时间；快照仍会照常建立")
 		pauseItems := make([]*systray.MenuItem, len(trayPauseChoices))
 		for i, c := range trayPauseChoices {
 			pauseItems[i] = pauseMenu.AddSubMenuItem(c.label, "")
 		}
-		resumeItem := systray.AddMenuItem("Resume syncing", "Start syncing again and catch up")
+		resumeItem := systray.AddMenuItem("恢复同步", "重新开始同步并补上进度")
 		resumeItem.Hide()
 		systray.AddSeparator()
-		quitItem := systray.AddMenuItem("Quit", "Stop syncing and exit")
+		quitItem := systray.AddMenuItem("退出", "停止同步并退出")
 
 		trayReady.Store(true)
 
@@ -175,7 +175,7 @@ func (a *App) startTray() {
 				case <-snapshotItem.ClickedCh:
 					if a.daemon != nil {
 						go func() {
-							a.daemon.SnapshotAll("Snapshot of every game, from the tray")
+							a.daemon.SnapshotAll("对所有游戏建立快照，来自托盘菜单")
 							select {
 							case prompt <- struct{}{}:
 							default:
@@ -252,7 +252,7 @@ func (a *App) showIfTrayNeverAppears() {
 		time.Sleep(100 * time.Millisecond)
 	}
 	if a.daemon != nil {
-		a.daemon.Log.Log("warn", "started hidden but no tray icon appeared; showing the window so it can be reached")
+		a.daemon.Log.Log("warn", "以隐藏方式启动但托盘图标未出现；改为显示窗口以便访问")
 	}
 	wailsruntime.WindowShow(a.ctx)
 }
@@ -270,7 +270,7 @@ func (a *App) beforeClose(ctx context.Context) bool {
 	}
 	wailsruntime.WindowHide(ctx)
 	if a.daemon != nil {
-		a.daemon.Log.Log("info", "window hidden to tray; syncing continues in the background")
+		a.daemon.Log.Log("info", "窗口已隐藏到托盘；同步仍在后台继续")
 	}
 	return true // prevent close
 }

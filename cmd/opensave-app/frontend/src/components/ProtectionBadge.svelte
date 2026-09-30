@@ -39,8 +39,7 @@
     {detail}
     {#if peer?.fingerprint}
       <div class="fingerprint">
-        Pairing fingerprint <code>{peer.fingerprint}</code> — it should read the same on the other
-        device.
+        配对指纹 <code>{peer.fingerprint}</code>——另一台设备上应显示相同内容。
       </div>
     {/if}
   </div>

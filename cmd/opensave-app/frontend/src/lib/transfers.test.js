@@ -9,16 +9,16 @@ describe('transfer wording', () => {
   });
 
   it('shows how far along a running transfer is, and the size of a finished one', () => {
-    expect(amountLabel({ state: 'running', bytesTransferred: 409600, totalBytes: 1048576 })).toBe('400.0 KB of 1.0 MB');
+    expect(amountLabel({ state: 'running', bytesTransferred: 409600, totalBytes: 1048576 })).toBe('400.0 KB（共 1.0 MB）');
     expect(amountLabel({ state: 'done', bytesTransferred: 1048576, totalBytes: 1048576 })).toBe('1.0 MB');
     expect(amountLabel({ state: 'error', bytesTransferred: 2048, totalBytes: 0 })).toBe('2.0 KB');
     expect(amountLabel({ state: 'done', bytesTransferred: 0, totalBytes: 0 })).toBe('');
   });
 
   it('says which way it went', () => {
-    expect(peerLabel({ direction: 'download', peer: 'Deck' })).toBe('from Deck');
-    expect(peerLabel({ direction: 'upload', peer: 'Deck' })).toBe('to Deck');
-    expect(peerLabel({ direction: 'download' })).toBe('from another device');
+    expect(peerLabel({ direction: 'download', peer: 'Deck' })).toBe('来自 Deck');
+    expect(peerLabel({ direction: 'upload', peer: 'Deck' })).toBe('发往 Deck');
+    expect(peerLabel({ direction: 'download' })).toBe('来自 另一台设备');
   });
 
   it("names each game, falling back to its id for one this device doesn't track", () => {

@@ -37,12 +37,12 @@
   }
 
   const pairDiscovered = (d) =>
-    run(() => api.post('/api/peers/pair', { address: d.address, port: d.port }), `Pairing request sent to ${d.deviceName}`);
+    run(() => api.post('/api/peers/pair', { address: d.address, port: d.port }), `已向 ${d.deviceName} 发送配对请求`);
   const pairManual = () =>
-    run(() => api.post('/api/peers/pair', { address: manualIp, port: Number(manualPort) }), 'Pairing request sent');
+    run(() => api.post('/api/peers/pair', { address: manualIp, port: Number(manualPort) }), '配对请求已发送');
   const unpair = async (peer) => {
-    if (!(await askConfirm(`Unpair "${peer.name}"? Their games stay on both devices; syncing between you stops.`, { title: 'Unpair device?', confirmText: 'Unpair', danger: true }))) return;
-    run(() => api.del(`/api/peers/${peer.id}`), `Unpaired ${peer.name}`);
+    if (!(await askConfirm(`解除与"${peer.name}"的配对？双方设备上的游戏都会保留，但将停止互相同步。`, { title: '解除配对？', confirmText: '解除配对', danger: true }))) return;
+    run(() => api.del(`/api/peers/${peer.id}`), `已解除与 ${peer.name} 的配对`);
   };
 
   // The only repair for a pairing with no encryption key is to make it again,
@@ -51,15 +51,15 @@
   // had fixed it, with two devices that no longer sync at all.
   const repairPairing = async (peer) => {
     const ok = await askConfirm(
-      `Unpair "${peer.name}", then pair the two devices again so they exchange an encryption key. ` +
-        `Their games and saves stay where they are. Nothing syncs between these two devices until ` +
-        `you pair them again.`,
-      { title: 'Unpair, so you can pair again?', confirmText: 'Unpair now' }
+      `解除与"${peer.name}"的配对，然后重新配对两台设备以交换加密密钥。` +
+        `双方的游戏和存档都保持原样。在重新配对之前，` +
+        `这两台设备之间不会同步任何内容。`,
+      { title: '解除配对以便重新配对？', confirmText: '立即解除' }
     );
     if (!ok) return;
     run(
       () => api.del(`/api/peers/${peer.id}`),
-      `Unpaired ${peer.name} — pair the two devices again to encrypt what you sync`
+      `已解除与 ${peer.name} 的配对——请重新配对两台设备以加密同步内容`
     );
   };
 
@@ -67,26 +67,26 @@
   // install it here — no manually copying the exe between machines.
   const updateFromPeer = async (peer) => {
     const ok = await askConfirm(
-      `${peer.name} is running a newer OpenSave build (${peer.appVersion}). Download it from ${peer.name} and update this device? OpenSave restarts itself when done.`,
-      { title: 'Update OpenSave?', confirmText: 'Update & restart' }
+      `${peer.name} 正在运行较新的 OpenSave 版本（${peer.appVersion}）。要从 ${peer.name} 下载并更新本设备吗？完成后 OpenSave 会自动重启。`,
+      { title: '更新 OpenSave？', confirmText: '更新并重启' }
     );
     if (!ok) return;
     const err = await native.installFromPeer(peer.id);
     if (err) toast(err, 'error');
   };
 
-  const fmtTime = (t) => (t ? new Date(t).toLocaleString() : 'never');
+  const fmtTime = (t) => (t ? new Date(t).toLocaleString() : '从未');
 </script>
 
 <div class="head">
-  <h2 class="page-title">Devices</h2>
+  <h2 class="page-title">设备</h2>
 </div>
 
-<h3 class="section">Paired devices</h3>
+<h3 class="section">已配对的设备</h3>
 {#if pairedList.length === 0}
   <div class="empty">
-    <h3>No paired devices</h3>
-    <p>Pair a device below — on your Wi-Fi it appears automatically, or connect over the internet with a room code.</p>
+    <h3>暂无已配对的设备</h3>
+    <p>在下方配对设备——同一 Wi-Fi 下会自动出现，也可以用房间码通过互联网连接。</p>
   </div>
 {:else}
   <div class="list">
@@ -101,8 +101,8 @@
             </span>
           </div>
           <div class="peer-meta">
-            {peer.address === 'relay' ? 'internet relay' : `${peer.address}:${peer.port}`}
-            · last synced {fmtTime(peer.lastSynced)}
+            {peer.address === 'relay' ? '互联网中继' : `${peer.address}:${peer.port}`}
+            · 上次同步 {fmtTime(peer.lastSynced)}
             {#if peer.appVersion}· OpenSave {peer.appVersion}{/if}
           </div>
           <!-- Per device, next to how it is reached, because that is the
@@ -111,38 +111,38 @@
             <ProtectionBadge {peer} compact />
             {#if protectionState(peer) === 'open'}
               <button class="linkish" disabled={busy} on:click={() => repairPairing(peer)}>
-                Fix this
+                修复
               </button>
             {/if}
           </div>
         </div>
         {#if peer.hasNewerBuild && peer.status === 'online'}
           <button class="btn small primary" disabled={busy || !!$appUpdate} on:click={() => updateFromPeer(peer)}>
-            <Download size={14} />Update from this device
+            <Download size={14} />从此设备更新
           </button>
         {/if}
-        <button class="btn small danger" disabled={busy} on:click={() => unpair(peer)}>Unpair</button>
+        <button class="btn small danger" disabled={busy} on:click={() => unpair(peer)}>解除配对</button>
       </div>
     {/each}
   </div>
 {/if}
 
-<h3 class="section">Add a device</h3>
+<h3 class="section">添加设备</h3>
 <div class="pill-tabs connect-tabs" use:slidingIndicator={{ inset: 10 }}>
-  <button class:active={connectTab === 'lan'} on:click={() => (connectTab = 'lan')}><Network size={15} />On this network</button>
+  <button class:active={connectTab === 'lan'} on:click={() => (connectTab = 'lan')}><Network size={15} />本地网络</button>
   <button class:active={connectTab === 'wan'} on:click={() => (connectTab = 'wan')}>
-    <Globe size={15} />Over the internet
+    <Globe size={15} />通过互联网
     {#if $wanRoom?.connected}<span class="tab-dot"></span>{/if}
   </button>
 </div>
 
 {#if connectTab === 'lan'}
   <p class="quiet lan-intro">
-    Devices running OpenSave on the same Wi-Fi/Ethernet discover each other automatically. No setup needed.
+    同一 Wi-Fi/以太网下运行 OpenSave 的设备会自动互相发现，无需任何设置。
   </p>
-  <h4 class="subsection">Found on your network</h4>
+  <h4 class="subsection">在网络中发现</h4>
   {#if lanDiscovered.length === 0}
-    <p class="quiet">No unpaired devices found on the local network. Make sure OpenSave is running on the other device.</p>
+    <p class="quiet">本地网络上未发现未配对的设备。请确认另一台设备上的 OpenSave 正在运行。</p>
   {:else}
     <div class="list">
       {#each lanDiscovered as d (d.id)}
@@ -152,17 +152,17 @@
             <div class="peer-name">{d.deviceName}</div>
             <div class="peer-meta">{d.address}:{d.port}</div>
           </div>
-          <button class="btn small primary" disabled={busy} on:click={() => pairDiscovered(d)}>Pair</button>
+          <button class="btn small primary" disabled={busy} on:click={() => pairDiscovered(d)}>配对</button>
         </div>
       {/each}
     </div>
   {/if}
 
-  <h4 class="subsection">Add by IP address</h4>
+  <h4 class="subsection">通过 IP 地址添加</h4>
   <div class="card manual">
     <input placeholder="192.168.1.42" bind:value={manualIp} />
     <input class="port" type="number" bind:value={manualPort} />
-    <button class="btn primary" disabled={!manualIp || busy} on:click={pairManual}>Send pairing request</button>
+    <button class="btn primary" disabled={!manualIp || busy} on:click={pairManual}>发送配对请求</button>
   </div>
 {:else}
   <InternetSync />

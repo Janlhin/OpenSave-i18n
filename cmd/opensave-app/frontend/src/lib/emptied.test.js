@@ -21,8 +21,8 @@ describe('emptied saves', () => {
   });
 
   it('names where the files went from', () => {
-    expect(emptiedWhere([''])).toBe('its save folder');
-    expect(emptiedWhere(['', 'Config'])).toBe('its save folder and its “Config” location');
+    expect(emptiedWhere([''])).toBe('其存档文件夹');
+    expect(emptiedWhere(['', 'Config'])).toBe('其存档文件夹和其“Config”位置');
   });
 
   it('comes first on the tile, and in the line above the library', () => {
@@ -33,6 +33,6 @@ describe('emptied saves', () => {
       { game: held, status: gameStatus(held) },
       { game: game('b'), status: { state: 'conflict' } }
     ];
-    expect(librarySummary(rows).headline).toBe("A's save files were all deleted here");
+    expect(librarySummary(rows).headline).toBe('A 的存档文件已在此全部删除');
   });
 });

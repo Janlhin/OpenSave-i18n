@@ -26,17 +26,16 @@
 <div class="overlay" on:click={() => dispatch('cancel')} out:dialogOut|global>
   <!-- svelte-ignore a11y-click-events-have-key-events a11y-no-static-element-interactions -->
   <div class="modal card" on:click|stopPropagation>
-    <h3 class="with-icon"><GitBranch size={19} /> New branch — {name}</h3>
-    <p class="desc">What should it start from?</p>
+    <h3 class="with-icon"><GitBranch size={19} /> 新建分支 — {name}</h3>
+    <p class="desc">它应该从什么内容开始？</p>
 
     <label class="choice" class:sel={copySave}>
       <input type="radio" bind:group={copySave} value={true} />
       <span class="c-body">
-        <span class="c-title">A copy of my current save</span>
+        <span class="c-title">当前存档的副本</span>
         <span class="c-desc">
-          "{name}" begins exactly where you are now. The two only diverge from the first
-          snapshot you take on it — so this is the one for trying something without losing your
-          place.
+          “{name}”从你现在的进度开始。直到你在这个分支上拍下第一张快照之前，两者完全相同 —
+          因此适合在不丢失进度的前提下做些尝试。
         </span>
       </span>
     </label>
@@ -44,22 +43,21 @@
     <label class="choice" class:sel={!copySave}>
       <input type="radio" bind:group={copySave} value={false} />
       <span class="c-body">
-        <span class="c-title">A fresh start — no save</span>
+        <span class="c-title">全新开始 — 无存档</span>
         <span class="c-desc">
-          "{name}" begins empty, for a new playthrough from scratch. Switching to it clears
-          your save folder — your current save is snapshotted first and comes straight back when
-          you switch to <strong>{activeBranch}</strong>.
+          “{name}”从空白开始，用于从头开始的全新一周目。切换到它时会清空存档文件夹 —
+          当前存档会先被快照，切回 <strong>{activeBranch}</strong> 时立即恢复。
         </span>
       </span>
     </label>
 
     <div class="actions">
-      <button class="btn" on:click={() => dispatch('cancel')}>Cancel</button>
-      <button class="btn primary" disabled={busy} on:click={() => dispatch('create', copySave)}>Create branch</button>
+      <button class="btn" on:click={() => dispatch('cancel')}>取消</button>
+      <button class="btn primary" disabled={busy} on:click={() => dispatch('create', copySave)}>创建分支</button>
     </div>
     <p class="hint-line">
-      <History size={15} class="inline-icon" /> Either way nothing is lost. Switching between branches snapshots whatever is in your
-      save folder first, and refuses to change anything if that snapshot can't be taken.
+      <History size={15} class="inline-icon" /> 无论哪种方式都不会丢失数据。在分支间切换时会先对存档文件夹中的内容做快照，
+      如果快照无法完成，就不会改动任何东西。
     </p>
   </div>
 </div>

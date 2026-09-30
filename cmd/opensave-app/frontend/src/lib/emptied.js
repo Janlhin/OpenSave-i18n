@@ -21,6 +21,6 @@ export function newlyEmptied(before, games) {
 
 /** Where the files went from, in words: "its save folder", or a location. */
 export function emptiedWhere(locations = []) {
-  const names = locations.map((n) => (n === '' ? 'its save folder' : `its “${n}” location`));
-  return names.length ? names.join(' and ') : 'its save folder';
+  const names = locations.map((n) => (n === '' ? '其存档文件夹' : `其“${n}”位置`));
+  return names.length ? names.join('和') : '其存档文件夹';
 }

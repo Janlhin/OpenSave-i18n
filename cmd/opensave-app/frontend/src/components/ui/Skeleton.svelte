@@ -9,7 +9,7 @@
   export let count = 3;
 </script>
 
-<div class="skel {kind}" aria-busy="true" aria-label="Loading">
+<div class="skel {kind}" aria-busy="true" aria-label="加载中">
   {#if kind === 'tiles'}
     <div class="skeleton bar" style="width: 100%; height: 64px; margin-bottom: 22px; border-radius: var(--radius-lg)"></div>
     <div class="grid">

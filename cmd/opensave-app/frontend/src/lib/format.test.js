@@ -36,9 +36,9 @@ describe('plural', () => {
 
 describe('playLength', () => {
   it('says how long, in hours and minutes', () => {
-    expect(playLength(45 * 60000)).toBe('45 min');
-    expect(playLength(3 * 3600000)).toBe('3 h');
-    expect(playLength(14 * 3600000 + 20 * 60000)).toBe('14 h 20 min');
-    expect(playLength(undefined)).toBe('0 min');
+    expect(playLength(45 * 60000)).toBe('45 分钟');
+    expect(playLength(3 * 3600000)).toBe('3 小时');
+    expect(playLength(14 * 3600000 + 20 * 60000)).toBe('14 小时 20 分钟');
+    expect(playLength(undefined)).toBe('0 分钟');
   });
 });

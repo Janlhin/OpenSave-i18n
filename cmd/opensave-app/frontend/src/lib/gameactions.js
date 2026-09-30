@@ -5,7 +5,6 @@
 // button on the game's page — same undo, same cloud question afterwards —
 // rather than a second, slightly different copy of it.
 import { derived, get, writable } from 'svelte/store';
-import { plural } from './format.js';
 import { api, native } from './api.js';
 import { askConfirm, gameList, games, navigate, toast, view } from './stores.js';
 import { hiddenKeys, withUndo } from './undo.js';
@@ -37,22 +36,22 @@ export function canLaunch(game) {
 export function gameMenuItems(game, { now = new Date(), favourite = false } = {}) {
   const latest = latestSnapshot(game);
   return [
-    { id: 'open', label: 'Open' },
-    { id: 'favourite', label: favourite ? 'Remove from Favourites' : 'Add to Favourites' },
-    { id: 'collections', label: 'Collections…' },
+    { id: 'open', label: '打开' },
+    { id: 'favourite', label: favourite ? '从收藏中移除' : '加入收藏' },
+    { id: 'collections', label: '合集…' },
     null,
-    { id: 'sync', label: 'Sync now' },
-    { id: 'snapshot', label: 'Snapshot now' },
-    ...(canLaunch(game) ? [{ id: 'launch', label: 'Launch' }] : []),
-    { id: 'folder', label: 'Open save folder' },
+    { id: 'sync', label: '立即同步' },
+    { id: 'snapshot', label: '立即快照' },
+    ...(canLaunch(game) ? [{ id: 'launch', label: '启动游戏' }] : []),
+    { id: 'folder', label: '打开存档文件夹' },
     {
       id: 'restore-latest',
-      label: 'Restore latest snapshot…',
+      label: '恢复最新快照…',
       disabled: !latest,
-      hint: latest ? whenLabel(latest.timestamp, now) : 'none yet'
+      hint: latest ? whenLabel(latest.timestamp, now) : '暂无'
     },
     null,
-    { id: 'untrack', label: 'Stop tracking', danger: true }
+    { id: 'untrack', label: '停止跟踪', danger: true }
   ];
 }
 
@@ -70,11 +69,11 @@ export async function runGameAction(id, game) {
     case 'open':
       return navigate('game', { gameId: game.id });
     case 'sync':
-      return attempt(() => api.post(`/api/games/${game.id}/sync`), `Syncing ${game.name}`);
+      return attempt(() => api.post(`/api/games/${game.id}/sync`), `正在同步 ${game.name}`);
     case 'snapshot':
-      return attempt(() => api.post(`/api/games/${game.id}/snapshot`, { comment: '' }), `Snapshot of ${game.name} taken`);
+      return attempt(() => api.post(`/api/games/${game.id}/snapshot`, { comment: '' }), `已为 ${game.name} 建立快照`);
     case 'launch':
-      return attempt(() => api.post(`/api/games/${game.id}/launch`), `Launching ${game.name}…`);
+      return attempt(() => api.post(`/api/games/${game.id}/launch`), `正在启动 ${game.name}…`);
     case 'folder': {
       const problem = await native.openFolder(game.savePath);
       if (problem) toast(problem, 'error');
@@ -95,7 +94,7 @@ async function restoreLatest(game) {
   const snap = latestSnapshot(game);
   if (!snap) return;
   if (!(await askRestore(game, snap))) return;
-  return attempt(() => api.post(`/api/games/${game.id}/rollback`, { snapshotId: snap.id }), `${game.name} restored`);
+  return attempt(() => api.post(`/api/games/${game.id}/rollback`, { snapshotId: snap.id }), `${game.name} 已恢复`);
 }
 
 /** Stops tracking a game, with a few seconds to undo it. */
@@ -103,7 +102,7 @@ export async function untrackGame(game) {
   const current = get(view);
   if (current.name === 'game' && current.params?.gameId === game.id) navigate('home');
   const outcome = await withUndo({
-    message: `Stopped tracking ${game.name}. Its snapshots stay on disk.`,
+    message: `已停止跟踪 ${game.name}。其快照仍保留在磁盘上。`,
     keys: [game.id],
     stillThere: (id) => !!get(games)[id],
     run: () => api.del(`/api/games/${game.id}`)
@@ -117,7 +116,7 @@ export function untrackGames(list) {
   const ids = list.map((g) => g.id);
   const n = ids.length;
   return withUndo({
-    message: `Stopped tracking ${n} game${n === 1 ? '' : 's'}. Their snapshots stay on disk.`,
+    message: `已停止跟踪 ${n} 个游戏。它们的快照仍保留在磁盘上。`,
     keys: ids,
     stillThere: (id) => !!get(games)[id],
     run: () => api.post('/api/games/untrack-bulk', { ids })
@@ -135,22 +134,22 @@ async function offerCloudCleanup(game) {
     return;
   }
   if (!settings?.cloudSync?.ready) return;
-  toast(`${game.name}'s cloud snapshots were kept.`, 'info', {
+  toast(`${game.name} 的云端快照已保留。`, 'info', {
     ttl: 12000,
     action: {
-      label: 'Delete them',
+      label: '删除它们',
       run: async () => {
-        const ok = await askConfirm(`Delete "${game.name}"'s snapshots from the cloud? Snapshots on your devices are not touched.`, {
-          title: 'Delete cloud copies?',
-          confirmText: 'Delete from cloud',
+        const ok = await askConfirm(`从云端删除“${game.name}”的快照？你设备上的快照不会受影响。`, {
+          title: '删除云端副本？',
+          confirmText: '从云端删除',
           danger: true
         });
         if (!ok) return;
         try {
           const res = await api.post(`/api/cloud/delete-game/${game.id}`);
-          toast(res.deleted > 0 ? `Removed ${plural(res.deleted, 'cloud snapshot')}` : 'No cloud snapshots to remove', 'success');
+          toast(res.deleted > 0 ? `已移除 ${res.deleted} 个云端快照` : '没有可移除的云端快照', 'success');
         } catch (e) {
-          toast(`Cloud cleanup failed: ${e.message}`, 'error');
+          toast(`云端清理失败：${e.message}`, 'error');
         }
       }
     }

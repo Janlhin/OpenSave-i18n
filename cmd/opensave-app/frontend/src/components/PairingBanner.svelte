@@ -17,14 +17,14 @@
   function onRequests(list) {
     const fresh = list.filter((r) => !seen.has(r.peerId));
     if (fresh.length > 0) {
-      const who = fresh[0].deviceName ?? 'A device';
-      demandAttention('pairing', { title: `${who} wants to pair`, body: 'Open OpenSave to accept or decline.', open: { view: 'devices', params: {} } });
-      toast(`${who} wants to pair`, 'info');
+      const who = fresh[0].deviceName ?? '某台设备';
+      demandAttention('pairing', { title: `${who} 想要配对`, body: '打开 OpenSave 以接受或拒绝。', open: { view: 'devices', params: {} } });
+      toast(`${who} 想要配对`, 'info');
     }
     seen = new Set(list.map((r) => r.peerId));
   }
 
-  const approve = (req) => act('/api/peers/approve', req, `Paired with ${req.deviceName}`);
+  const approve = (req) => act('/api/peers/approve', req, `已与 ${req.deviceName} 配对`);
   const reject = (req) => act('/api/peers/reject', req, null);
 
   async function act(path, req, okMsg) {
@@ -40,7 +40,7 @@
     }
   }
 
-  const source = (req) => (req.isWan ? 'over the internet' : `from ${req.address}`);
+  const source = (req) => (req.isWan ? '来自互联网' : `来自 ${req.address}`);
 </script>
 
 {#if $pairingRequests.length > 0}
@@ -49,12 +49,12 @@
       <div class="pair-card" transition:fly={{ y: -20, duration: 200 }}>
         <div class="pair-icon"><Link size={19} /></div>
         <div class="pair-body">
-          <div class="pair-title"><strong>{req.deviceName ?? 'A device'}</strong> wants to pair</div>
-          <div class="pair-sub">{source(req)} · approve to start syncing your saves</div>
+          <div class="pair-title"><strong>{req.deviceName ?? '某台设备'}</strong> 想要配对</div>
+          <div class="pair-sub">{source(req)} · 批准后即可开始同步你的存档</div>
         </div>
         <div class="pair-actions">
-          <button class="btn small" disabled={busy} on:click={() => reject(req)}>Ignore</button>
-          <button class="btn small primary" disabled={busy} on:click={() => approve(req)}>Approve</button>
+          <button class="btn small" disabled={busy} on:click={() => reject(req)}>忽略</button>
+          <button class="btn small primary" disabled={busy} on:click={() => approve(req)}>批准</button>
         </div>
       </div>
     {/each}

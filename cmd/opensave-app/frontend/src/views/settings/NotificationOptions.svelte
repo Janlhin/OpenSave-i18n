@@ -16,11 +16,11 @@
   let showing = false;
   function showMe() {
     showing = true;
-    toast('Hades: got 3 files from Steam Deck — an example', 'info', { action: { label: 'Open', run: () => {} } });
+    toast('Hades：从 Steam Deck 收到 3 个文件——示例', 'info', { action: { label: '打开', run: () => {} } });
     exampleEvents.update((list) => [exampleEvent(), ...list]);
     setTimeout(() => {
       playChime();
-      toast('That chime is for something that needs you — a conflict, an emptied save, a device asking to pair. OpenSave also comes to the front for it.', 'warning', { ttl: 9000 });
+      toast('这声提示音意味着有需要你处理的事情——冲突、存档被清空、有设备请求配对。此时 OpenSave 也会自动来到前台。', 'warning', { ttl: 9000 });
     }, 2200);
     setTimeout(async () => {
       showing = false;
@@ -28,11 +28,11 @@
       const game = $gameList[0];
       const why = await native.desktopNotify({
         title: game?.name ?? 'Hades',
-        body: 'Got 3 files from Steam Deck — an example',
+        body: '从 Steam Deck 收到 3 个文件——示例',
         image: game ? gameCover(game) : '',
         open: JSON.stringify(game ? { view: 'game', params: { gameId: game.id } } : { view: 'settings', params: {} })
       });
-      toast(why ? `A desktop notification could not be shown: ${why}` : 'And that one is from the desktop, for when OpenSave is not in front. Click it to open the game.', why ? 'error' : 'info', { ttl: 9000 });
+      toast(why ? `无法显示桌面通知：${why}` : '这一条来自桌面通知，用于 OpenSave 不在前台时。点击即可打开该游戏。', why ? 'error' : 'info', { ttl: 9000 });
     }, 4800);
   }
 
@@ -44,11 +44,11 @@
 <div class="notif">
 <div class="demo">
   <p class="hint">
-    Everything also goes behind the bell at the top of the window, which counts what's new and what is waiting on you.
+    所有内容也会进入窗口顶部的铃铛，其中会统计新消息和等待你处理的事项。
   </p>
-  <button class="btn small" disabled={showing} on:click={showMe}><BellRing size={14} />Show me</button>
+  <button class="btn small" disabled={showing} on:click={showMe}><BellRing size={14} />演示一下</button>
 </div>
-<p class="lead">Chime and bring OpenSave to the front when…</p>
+<p class="lead">以下情况时提示音并将 OpenSave 带到前台…</p>
 {#each attention as [key, e]}
   <label class="check">
     <input type="checkbox" checked={$notifyPrefs[key]} on:change={() => toggle(key)} />
@@ -56,7 +56,7 @@
   </label>
 {/each}
 
-<p class="lead">Show a message when…</p>
+<p class="lead">以下情况时显示消息…</p>
 {#each messages as [key, e]}
   <label class="check">
     <input type="checkbox" checked={$notifyPrefs[key]} on:change={() => toggle(key)} />
@@ -66,18 +66,18 @@
 
 <label class="check quiet">
   <input type="checkbox" checked={$notifyPrefs.desktop} on:change={() => toggle('desktop')} />
-  Show them on the desktop when OpenSave isn't in front
+  OpenSave 不在前台时在桌面上显示通知
 </label>
 <p class="hint">
-  As the system's own notification, with the game's cover. Clicking one opens it in OpenSave.
+  以系统原生通知的形式显示，并带有游戏封面。点击通知即可在 OpenSave 中打开对应内容。
 </p>
 
 <label class="check quiet">
   <input type="checkbox" checked={$notifyPrefs.quietWhilePlaying} on:change={() => toggle('quietWhilePlaying')} />
-  Stay quiet while a full-screen game is running
+  全屏游戏运行时保持安静
 </label>
 <p class="hint">
-  No chime, no desktop notification and no window in front of your game. Whatever it was waits behind the bell for when you come back.
+  不播放提示音、不显示桌面通知，也不会有窗口挡在你的游戏前面。无论如何，通知都会留在铃铛里等你回来查看。
 </p>
 </div>
 

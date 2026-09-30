@@ -47,12 +47,12 @@ describe('desktop notifications', () => {
   it('say what happened plainly', () => {
     expect(arrivalNote({ gameId: 'hades', files: 3, device: 'Steam Deck' }, { hades })).toMatchObject({
       title: 'Hades',
-      body: 'Got 3 files from Steam Deck',
+      body: '从 Steam Deck 收到 3 个文件',
       game: hades
     });
     expect(arrivalNote({ gameId: 'gone' }, { hades })).toBeNull();
-    expect(newGamesNote([{ name: 'Balatro' }]).title).toBe('New game found');
-    expect(newGamesNote([{ name: 'A' }, { name: 'B' }, { name: 'C' }, { name: 'D' }]).body).toMatch(/^A, B and 2 more/);
+    expect(newGamesNote([{ name: 'Balatro' }]).title).toBe('发现新游戏');
+    expect(newGamesNote([{ name: 'A' }, { name: 'B' }, { name: 'C' }, { name: 'D' }]).body).toMatch(/^A, B 等 4 个/);
     expect(newGamesNote([])).toBeNull();
   });
 

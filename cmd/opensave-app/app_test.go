@@ -60,7 +60,7 @@ func TestRevealTargetDir(t *testing.T) {
 		if problem == "" {
 			t.Fatal("missing folder should report a problem")
 		}
-		if !strings.Contains(strings.ToLower(problem), "no longer exists") {
+		if !strings.Contains(problem, "已不存在") {
 			t.Errorf("message should say the folder is gone, got %q", problem)
 		}
 	})

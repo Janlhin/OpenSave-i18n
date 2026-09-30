@@ -12,12 +12,12 @@ import { writable } from 'svelte/store';
 
 export const COVER_STYLES = {
   // Steam's header image, 460×215: the title is legible in the art.
-  wide: { label: 'Wide banners', aspect: '460 / 215' },
+  wide: { label: '宽幅横图', aspect: '460 / 215' },
   // Steam's library capsule, 600×900: about twice as many games on screen.
-  tall: { label: 'Tall box art', aspect: '600 / 900' }
+  tall: { label: '竖版封面', aspect: '600 / 900' }
 };
 
-export const TILE_SIZES = { small: 'Small', medium: 'Medium', large: 'Large' };
+export const TILE_SIZES = { small: '小', medium: '中', large: '大' };
 
 // Narrowest a tile may get when the number per row is left to the window.
 const MIN_WIDTH = {
@@ -82,13 +82,13 @@ libraryView.subscribe((v) => saveView(v));
 
 // What a game's status line says, gathered into what someone would look for.
 export const STATUS_FILTERS = [
-  { id: 'all', label: 'All', states: null },
-  { id: 'attention', label: 'Needs attention', states: ['missing', 'conflict', 'error'] },
-  { id: 'syncing', label: 'Syncing', states: ['syncing'] },
-  { id: 'synced', label: 'Synced', states: ['synced'] },
-  { id: 'unsynced', label: 'Not synced yet', states: ['unsynced'] },
-  { id: 'paused', label: 'Auto-sync off', states: ['paused'] },
-  { id: 'empty', label: 'No snapshot yet', states: ['empty'] }
+  { id: 'all', label: '全部', states: null },
+  { id: 'attention', label: '需要关注', states: ['missing', 'conflict', 'error'] },
+  { id: 'syncing', label: '同步中', states: ['syncing'] },
+  { id: 'synced', label: '已同步', states: ['synced'] },
+  { id: 'unsynced', label: '尚未同步', states: ['unsynced'] },
+  { id: 'paused', label: '自动同步已关闭', states: ['paused'] },
+  { id: 'empty', label: '暂无快照', states: ['empty'] }
 ];
 
 const byId = Object.fromEntries(STATUS_FILTERS.map((f) => [f.id, f]));

@@ -42,22 +42,23 @@
 
   const label = (s) => `${whenLabel(s.timestamp)} — ${s.note || snapshotKind(s).title}`;
   const icons = { changed: FilePen, added: FilePlus, removed: FileMinus };
+  const kindLabels = { changed: '修改', added: '新增', removed: '删除' };
   const sizes = (c) =>
     c.change === 'changed' ? `${fmtSize(c.fromSize)} → ${fmtSize(c.toSize)}` : fmtSize(c.change === 'added' ? c.toSize : c.fromSize);
 </script>
 
-<Modal title="Compare snapshots" icon={GitCompareArrows} {onClose} width={640} height="auto" maxHeight="min(80vh, 680px)">
+<Modal title="比较快照" icon={GitCompareArrows} {onClose} width={640} height="auto" maxHeight="min(80vh, 680px)">
   <svelte:fragment slot="sub">{game.name}</svelte:fragment>
   <div class="body">
     <div class="pick">
       <label class="field">
-        <span>From</span>
+        <span>起始快照</span>
         <select bind:value={from}>
           {#each snapshots as s (s.id)}<option value={s.id}>{label(s)}</option>{/each}
         </select>
       </label>
       <label class="field">
-        <span>To</span>
+        <span>目标快照</span>
         <select bind:value={to}>
           {#each snapshots as s (s.id)}<option value={s.id}>{label(s)}</option>{/each}
         </select>
@@ -65,21 +66,21 @@
     </div>
 
     {#if error}
-      <p class="quiet">Couldn't compare them: {error}</p>
+      <p class="quiet">无法比较：{error}</p>
     {:else if !result}
-      <p class="quiet"><Spinner size={13} /> Comparing…</p>
+      <p class="quiet"><Spinner size={13} /> 正在比较…</p>
     {:else if result.changes.length === 0}
-      <p class="quiet">{from === to ? 'The same snapshot.' : `No difference: the same ${result.unchanged} file${result.unchanged === 1 ? '' : 's'} in both.`}</p>
+      <p class="quiet">{from === to ? '是同一张快照。' : `没有差异：两边各有 ${result.unchanged} 个相同的文件。`}</p>
     {:else}
       <p class="count" class:stale={loading}>
-        {result.changes.length} file{result.changes.length === 1 ? '' : 's'} differ{result.changes.length === 1 ? 's' : ''}{#if result.unchanged}, {result.unchanged} the same{/if}
+        {result.changes.length} 个文件有差异{#if result.unchanged}，{result.unchanged} 个相同{/if}
       </p>
       <ul class:stale={loading}>
         {#each result.changes as c (c.location + '/' + c.path)}
           <li class="change {c.change}">
             <svelte:component this={icons[c.change]} size={14} />
             <span class="path" title={c.path}>{c.location ? `${c.location}/` : ''}{c.path}</span>
-            <span class="kind">{c.change}</span>
+            <span class="kind">{kindLabels[c.change] ?? c.change}</span>
             <span class="sizes">{sizes(c)}</span>
           </li>
         {/each}

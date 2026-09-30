@@ -10,8 +10,8 @@
 
 <div class="options">
   <div class="group">
-    <div class="label">Covers</div>
-    <div class="styles" role="radiogroup" aria-label="Cover style">
+    <div class="label">封面样式</div>
+    <div class="styles" role="radiogroup" aria-label="封面样式">
       {#each Object.entries(COVER_STYLES) as [id, style]}
         <button
           class="style"
@@ -31,16 +31,16 @@
 
   <div class="row">
     <label class="group">
-      <span class="label">Tiles per row</span>
+      <span class="label">每行数量</span>
       <select value={String($libraryView.columns)} on:change={(e) => set({ columns: e.currentTarget.value === 'auto' ? 'auto' : Number(e.currentTarget.value) })}>
         {#each COLUMN_CHOICES as c}
-          <option value={String(c)}>{c === 'auto' ? 'As many as fit' : c}</option>
+          <option value={String(c)}>{c === 'auto' ? '自动铺满' : c}</option>
         {/each}
       </select>
     </label>
 
     <div class="group">
-      <span class="label">Tile size</span>
+      <span class="label">方块大小</span>
       <div class="segmented" class:off={$libraryView.columns !== 'auto'} use:slidingIndicator={{ mode: 'fill' }}>
         {#each Object.entries(TILE_SIZES) as [id, label]}
           <button
@@ -55,12 +55,12 @@
     </div>
   </div>
   {#if $libraryView.columns !== 'auto'}
-    <p class="note">With a set number per row, the tiles share the width between them.</p>
+    <p class="note">设定固定数量后，方块会在一行内平分宽度。</p>
   {/if}
 
   <label class="check">
     <input type="checkbox" checked={$libraryView.overview} on:change={(e) => set({ overview: e.currentTarget.checked })} />
-    Show recent activity on Home
+    在主页显示最近动态
   </label>
 </div>
 

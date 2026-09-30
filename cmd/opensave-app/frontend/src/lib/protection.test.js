@@ -82,7 +82,7 @@ describe('wording', () => {
   });
 
   it('does not use the word encrypted for a state that is not', () => {
-    expect(PROTECTION_LABELS.open.toLowerCase()).toContain('not encrypted');
-    expect(PROTECTION_LABELS.direct.toLowerCase()).not.toContain('encrypted');
+    expect(PROTECTION_LABELS.open).toBe('未加密');
+    expect(PROTECTION_LABELS.direct).not.toContain('加密');
   });
 });

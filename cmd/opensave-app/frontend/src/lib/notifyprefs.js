@@ -17,12 +17,12 @@
 import { writable, get } from 'svelte/store';
 
 export const NOTIFY_EVENTS = {
-  pairing: { label: 'A device asks to pair', kind: 'attention' },
-  conflicts: { label: 'Two saves conflict', kind: 'attention' },
-  emptied: { label: 'Every save file of a game is deleted here', kind: 'attention' },
-  arrivals: { label: 'A save arrives from another device', kind: 'message' },
-  cloudPulled: { label: 'A newer save is brought from the cloud', kind: 'message' },
-  newGames: { label: 'A newly installed game is found', kind: 'message' }
+  pairing: { label: '设备请求配对', kind: 'attention' },
+  conflicts: { label: '两份存档发生冲突', kind: 'attention' },
+  emptied: { label: '游戏的所有存档文件已在此删除', kind: 'attention' },
+  arrivals: { label: '存档从另一台设备到达', kind: 'message' },
+  cloudPulled: { label: '从云端取来了更新的存档', kind: 'message' },
+  newGames: { label: '发现了新安装的游戏', kind: 'message' }
 };
 
 export const DEFAULT_NOTIFY = Object.freeze({

@@ -22,11 +22,11 @@
   const runner = createRunner();
 
   const tabs = [
-    { id: 'snapshots', label: 'Snapshots', icon: History, component: SnapshotsTab },
-    { id: 'branches', label: 'Branches', icon: GitBranch, component: BranchesTab },
-    { id: 'cloud', label: 'Cloud', icon: Cloud, component: CloudTab },
-    { id: 'config', label: 'Configuration', icon: SlidersHorizontal, component: ConfigTab },
-    { id: 'danger', label: 'Manage', icon: Wrench, component: ManageTab }
+    { id: 'snapshots', label: '快照', icon: History, component: SnapshotsTab },
+    { id: 'branches', label: '分支', icon: GitBranch, component: BranchesTab },
+    { id: 'cloud', label: '云端', icon: Cloud, component: CloudTab },
+    { id: 'config', label: '设置', icon: SlidersHorizontal, component: ConfigTab },
+    { id: 'danger', label: '管理', icon: Wrench, component: ManageTab }
   ];
   let tab = 'snapshots';
 
@@ -52,7 +52,7 @@
 </script>
 
 {#if !game}
-  <div class="empty"><h3>Game not found</h3></div>
+  <div class="empty"><h3>未找到游戏</h3></div>
 {:else}
   {#key params.gameId}
     <GameHeader {game} {runner} />

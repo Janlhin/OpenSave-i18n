@@ -24,9 +24,9 @@ describe('whenLabel and dayLabel', () => {
     expect(whenLabel(at(20, 9, 30), now)).not.toBe(whenLabel(at(24, 9, 30), now));
   });
   it('names today and yesterday, and dates the rest', () => {
-    expect(dayLabel(at(24, 1), now)).toBe('Today');
-    expect(dayLabel(at(23, 23), now)).toBe('Yesterday');
-    expect(dayLabel(at(20, 12), now)).not.toMatch(/Today|Yesterday/);
+    expect(dayLabel(at(24, 1), now)).toBe('今天');
+    expect(dayLabel(at(23, 23), now)).toBe('昨天');
+    expect(dayLabel(at(20, 12), now)).not.toMatch(/今天|昨天/);
   });
 });
 
@@ -35,7 +35,7 @@ describe('humanizeComment', () => {
     const id = `snap_${at(24, 13, 5).getTime()}`;
     const out = humanizeComment(`Pre-rollback safety restore point (before restoring ${id})`, now);
     expect(out).not.toContain('snap_');
-    expect(out).toContain(`the ${whenLabel(at(24, 13, 5), now)} snapshot`);
+    expect(out).toContain(`${whenLabel(at(24, 13, 5), now)} 的快照`);
   });
   it('leaves other text alone', () => {
     expect(humanizeComment('before the boss', now)).toBe('before the boss');
@@ -51,22 +51,22 @@ describe('snapshotKind', () => {
       kind: 'manual',
       title: 'before the boss'
     });
-    expect(snapshotKind({ isSystemAuto: false, comment: '' }).title).toBe('Snapshot');
+    expect(snapshotKind({ isSystemAuto: false, comment: '' }).title).toBe('快照');
     // What the daemon stores when no comment was given.
-    expect(snapshotKind({ isSystemAuto: false, comment: 'Manual snapshot' }).title).toBe('Snapshot');
+    expect(snapshotKind({ isSystemAuto: false, comment: 'Manual snapshot' }).title).toBe('快照');
   });
 
   it('marks the save as a play session left it', () => {
     expect(snapshotKind(auto('After playing (1 h 12 min)'))).toMatchObject({
       kind: 'session',
-      label: 'After playing',
+      label: '游玩后',
       title: 'After playing (1 h 12 min)'
     });
   });
 
   it('says a save changed for the watcher’s own snapshots', () => {
-    expect(snapshotKind(auto(''))).toMatchObject({ kind: 'auto', title: 'Save changed' });
-    expect(snapshotKind(auto('Auto backup'))).toMatchObject({ kind: 'auto', title: 'Save changed' });
+    expect(snapshotKind(auto(''))).toMatchObject({ kind: 'auto', title: '存档发生变化' });
+    expect(snapshotKind(auto('Auto backup'))).toMatchObject({ kind: 'auto', title: '存档发生变化' });
   });
 
   it('recognises the first snapshot', () => {
@@ -93,11 +93,11 @@ describe('snapshotKind', () => {
     const id = `snap_${at(24, 13, 5).getTime()}`;
     const t = whenLabel(at(24, 13, 5), now);
     const title = (c) => snapshotKind(auto(c), now).title;
-    expect(title(`Pre-rollback safety restore point (before restoring ${id})`)).toBe(`Before restoring the ${t} snapshot`);
-    expect(title('before sync replaced local files')).toBe('Before a sync replaced it');
-    expect(title(`Safety snapshot before restoring file "a.sav" from ${id}`)).toBe(`Before putting back a.sav from the ${t} snapshot`);
-    expect(title('Auto backup before switching to branch "ng"')).toBe('Before switching to ng');
-    expect(title('Branch "ng" created from "main"')).toBe('Start of ng, copied from main');
+    expect(title(`Pre-rollback safety restore point (before restoring ${id})`)).toBe(`恢复前：${t} 的快照`);
+    expect(title('before sync replaced local files')).toBe('同步替换本地文件之前');
+    expect(title(`Safety snapshot before restoring file "a.sav" from ${id}`)).toBe(`放回 a.sav 前（来自 ${t} 的快照）`);
+    expect(title('Auto backup before switching to branch "ng"')).toBe('切换到 ng 之前');
+    expect(title('Branch "ng" created from "main"')).toBe('ng 的起点，复制自 main');
   });
 
   it('keeps any other automatic reason as it was written', () => {
@@ -114,9 +114,9 @@ describe('groupByDay', () => {
       { id: 'd', timestamp: at(20, 8).toISOString() }
     ];
     const g = groupByDay(snaps, now);
-    expect(g.map((x) => [x.day === 'Today' || x.day === 'Yesterday' ? x.day : 'date', x.snaps.map((s) => s.id)])).toEqual([
-      ['Today', ['a', 'b']],
-      ['Yesterday', ['c']],
+    expect(g.map((x) => [x.day === '今天' || x.day === '昨天' ? x.day : 'date', x.snaps.map((s) => s.id)])).toEqual([
+      ['今天', ['a', 'b']],
+      ['昨天', ['c']],
       ['date', ['d']]
     ]);
   });

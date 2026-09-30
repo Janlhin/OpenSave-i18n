@@ -14,8 +14,8 @@
 
 <div class="panel">
   <div class="head">
-    <strong>{group.primary.name}</strong> was found in {group.members.length} places.
-    Tick the folders that belong to this save — they are tracked as one game.
+    <strong>{group.primary.name}</strong> 在 {group.members.length} 个位置被发现。
+    勾选属于这份存档的文件夹 — 它们会被作为一个游戏来跟踪。
   </div>
   {#each group.members as m (m.id)}
     {@const tracked = trackedPaths.has(normPath(m.savePath))}
@@ -30,11 +30,11 @@
         <span class="path">{m.savePath}</span>
         <span class="meta">
           {contentsLabel(m)}
-          {#if m.role === 'primary'}<span class="tag tag-primary">the save folder</span>
-          {:else if m.role === 'location'}<span class="tag tag-loc">part of the same save</span>
-          {:else if m.role === 'inside'}<span class="tag">already inside the folder above</span>
-          {:else if m.role === 'alternative'}<span class="tag tag-alt">another copy — probably an old install</span>{/if}
-          {#if tracked}<span class="tag tag-primary">already tracked</span>{/if}
+          {#if m.role === 'primary'}<span class="tag tag-primary">存档文件夹</span>
+          {:else if m.role === 'location'}<span class="tag tag-loc">同一份存档的一部分</span>
+          {:else if m.role === 'inside'}<span class="tag">已包含在上面的文件夹中</span>
+          {:else if m.role === 'alternative'}<span class="tag tag-alt">另一个副本 — 可能是旧安装的残留</span>{/if}
+          {#if tracked}<span class="tag tag-primary">已在跟踪</span>{/if}
         </span>
       </span>
     </label>

@@ -87,8 +87,8 @@
   const deleteCloud = async (g, f) => {
     if (
       !(await askConfirm(
-        `Delete ${f.snapshotId} of "${g.gameName}" from the cloud? Snapshots stored on your devices are not affected.`,
-        { title: 'Delete cloud snapshot?', confirmText: 'Delete', danger: true }
+        `从云端删除 "${g.gameName}" 的 ${f.snapshotId}？设备上存储的快照不受影响。`,
+        { title: '删除云端快照？', confirmText: '删除', danger: true }
       ))
     )
       return;
@@ -99,7 +99,7 @@
       g.count = g.snapshots.length;
       g.totalSize = g.snapshots.reduce((n, x) => n + x.sizeBytes, 0);
       cloudGames = cloudGames.filter((x) => x.count > 0);
-      toast('Deleted from cloud', 'success');
+      toast('已从云端删除', 'success');
     } catch (e) {
       handleCloudError(e);
     } finally {
@@ -108,11 +108,11 @@
   };
 
   const restoreCloud = async (gameId, file) => {
-    if (!(await askConfirm(`Restore ${file.snapshotId} from the cloud over your current save?`, { title: 'Restore from cloud?', confirmText: 'Restore' }))) return;
+    if (!(await askConfirm(`从云端恢复 ${file.snapshotId} 并覆盖当前存档？`, { title: '从云端恢复？', confirmText: '恢复' }))) return;
     busy.set(true);
     try {
       await api.post(`/api/cloud/restore/${gameId}`, { fileName: file.name });
-      toast('Restored from cloud', 'success');
+      toast('已从云端恢复', 'success');
     } catch (e) {
       handleCloudError(e);
     } finally {
@@ -126,8 +126,8 @@
       const res = await api.post(`/api/cloud/sync-local/${gameId}`);
       toast(
         res.uploaded === 0 && res.skipped > 0
-          ? `Everything already in the cloud (${res.skipped} skipped)`
-          : `Uploaded ${res.uploaded}, skipped ${res.skipped}`,
+          ? `云端已全部存在（跳过 ${res.skipped} 个）`
+          : `已上传 ${res.uploaded} 个，跳过 ${res.skipped} 个`,
         'success'
       );
       await browse(); // the detail re-derives from the fresh listing
@@ -139,55 +139,54 @@
     }
   };
 
-  const tabOptions = [['all', 'All'], ['cloud', 'In cloud'], ['local', 'Not uploaded']];
+  const tabOptions = [['all', '全部'], ['cloud', '在云端'], ['local', '未上传']];
 </script>
 
-<Modal title="Cloud snapshots" icon={Cloud} onClose={close}>
+<Modal title="云端快照" icon={Cloud} onClose={close}>
   <svelte:fragment slot="sub">
     {#if browsing}
-      Reading cloud storage…
+      正在读取云存储…
     {:else if cloudGames}
-      {cloudGames.length} game{cloudGames.length === 1 ? '' : 's'} · {totals.snaps}
-      snapshot{totals.snaps === 1 ? '' : 's'} · {fmtSize(totals.size)} in the cloud
+      {cloudGames.length} 个游戏 · {totals.snaps} 个快照 · 云端共 {fmtSize(totals.size)}
     {:else}
-      Could not read cloud storage
+      无法读取云存储
     {/if}
   </svelte:fragment>
   <svelte:fragment slot="actions">
     <button class="btn small" disabled={browsing} on:click={browse}>
-      <RefreshCw size={14} />{browsing ? 'Loading…' : 'Refresh'}
+      <RefreshCw size={14} />{browsing ? '加载中…' : '刷新'}
     </button>
   </svelte:fragment>
 
   {#if browsing && !cloudGames}
-    <ModalLoading>Listing snapshots from your provider…</ModalLoading>
+    <ModalLoading>正在从服务商列出快照…</ModalLoading>
   {:else if cloudGames && detail}
     <!-- drill-in: one game's cloud snapshots -->
     <div class="detail-head">
-      <button class="btn small" on:click={() => (detailId = null)}><ArrowLeft size={14} />Back</button>
+      <button class="btn small" on:click={() => (detailId = null)}><ArrowLeft size={14} />返回</button>
       <div class="detail-title">
         <strong>{detail.name}</strong>
         <span class="quiet">
           {#if detail.cloud}
-            {detail.cloud.count} snapshot{detail.cloud.count === 1 ? '' : 's'} · {fmtSize(detail.cloud.totalSize)} in the cloud
+            云端 {detail.cloud.count} 个快照 · {fmtSize(detail.cloud.totalSize)}
           {:else}
-            nothing in the cloud yet
+            云端还没有内容
           {/if}
         </span>
       </div>
       {#if detail.tracked}
         <button class="btn small" disabled={uploading} on:click={() => uploadLocal(detail.id)}>
-          <Upload size={14} />{uploading ? 'Uploading…' : 'Upload local snapshots'}
+          <Upload size={14} />{uploading ? '上传中…' : '上传本地快照'}
         </button>
       {/if}
     </div>
     {#if uploading}
       <ProgressBar done={uploadProg?.done ?? 0} total={uploadProg?.total ?? 0}>
         {#if uploadProg && uploadProg.total > 0}
-          Uploading {Math.min(uploadProg.done + 1, uploadProg.total)} of {uploadProg.total}
+          正在上传第 {Math.min(uploadProg.done + 1, uploadProg.total)} 个，共 {uploadProg.total} 个
           {#if uploadProg.current}&nbsp;— <code>{uploadProg.current}</code>{/if}
         {:else}
-          Checking what needs uploading…
+          正在检查需要上传的内容…
         {/if}
       </ProgressBar>
     {/if}
@@ -202,37 +201,37 @@
             <button
               class="btn small primary"
               disabled={$busy || !detail.tracked}
-              title={detail.tracked ? 'Download and restore this snapshot' : 'Track this game first to restore'}
+              title={detail.tracked ? '下载并恢复此快照' : '请先跟踪此游戏才能恢复'}
               on:click={() => restoreCloud(detail.id, f)}
             >
-              Restore
+              恢复
             </button>
             <button
               class="btn small danger"
               disabled={$busy}
-              title="Delete from the cloud (local snapshots are kept)"
+              title="从云端删除（本地快照保留）"
               on:click={() => deleteCloud(detail.cloud, f)}
             >
-              Delete
+              删除
             </button>
           </div>
         {/each}
       {:else}
         <div class="empty-state">
           <div class="empty-icon"><Cloud size={36} strokeWidth={1.5} /></div>
-          <p>No cloud snapshots for this game yet.</p>
-          <p class="quiet">Use <strong>Upload local snapshots</strong> above to push them up.</p>
+          <p>此游戏在云端还没有快照。</p>
+          <p class="quiet">使用上方的<strong>上传本地快照</strong>将其推送上去。</p>
         </div>
       {/if}
     </div>
     <ModalFoot>
-      <span class="quiet">Deleting only removes the cloud copy — snapshots on your devices stay.</span>
-      <button class="btn" on:click={close}>Close</button>
+      <span class="quiet">删除只会移除云端副本——设备上的快照不受影响。</span>
+      <button class="btn" on:click={close}>关闭</button>
     </ModalFoot>
   {:else if cloudGames}
     <!-- tile grid -->
     <div class="toolbar">
-      <SearchInput placeholder="Filter by name…" bind:value={filter} />
+      <SearchInput placeholder="按名称筛选…" bind:value={filter} />
       <FilterTabs options={tabOptions} counts={tabCounts} bind:value={tab} />
     </div>
 
@@ -243,7 +242,7 @@
             name={t.name}
             src={t.coverUrl}
             icon={t.cloud ? Cloud : HardDrive}
-            badge={t.cloud ? String(t.cloud.count) : 'local only'}
+            badge={t.cloud ? String(t.cloud.count) : '仅本地'}
             badgeIcon={t.cloud ? Cloud : null}
             badgeAccent={!!t.cloud}
             hoverLayout="center"
@@ -251,21 +250,21 @@
           >
             <svelte:fragment slot="hover">
               <button class="btn small primary" on:click|stopPropagation={() => (detailId = t.id)}>
-                {t.cloud ? 'Browse' : 'Upload'}
+                {t.cloud ? '浏览' : '上传'}
               </button>
             </svelte:fragment>
           </CoverTile>
         {:else}
           <div class="grid-empty">
-            {tiles.length === 0 ? 'No tracked games and nothing in the cloud yet.' : 'No matches for this filter.'}
+            {tiles.length === 0 ? '暂无已跟踪的游戏，云端也没有内容。' : '没有符合筛选条件的结果。'}
           </div>
         {/each}
       </div>
     </div>
 
     <ModalFoot>
-      <span class="quiet">Click a game to browse, restore, delete, or upload its snapshots.</span>
-      <button class="btn" on:click={close}>Close</button>
+      <span class="quiet">点击游戏即可浏览、恢复、删除或上传其快照。</span>
+      <button class="btn" on:click={close}>关闭</button>
     </ModalFoot>
   {/if}
 </Modal>

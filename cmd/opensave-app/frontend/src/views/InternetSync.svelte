@@ -78,9 +78,9 @@
       if (!code) {
         if ($wanRoom?.enabled) {
           await saveSettings({ syncCode: '', relayUrl: relayDraft.trim() });
-          toast('Left the relay room', 'success');
+          toast('已退出中继房间', 'success');
         } else {
-          toast('Enter a room code first', 'error');
+          toast('请先输入房间码', 'error');
         }
         return;
       }
@@ -88,20 +88,20 @@
       await saveSettings({ syncCode: code, relayUrl: relayDraft.trim() });
       // Saving identical settings doesn't re-dial, so force a fresh attempt.
       if (rejoining) await api.post('/api/relay/reconnect');
-      toast(rejoining ? `Reconnecting to room “${code}”…` : `Joining room “${code}”…`);
+      toast(rejoining ? `正在重新连接房间“${code}”…` : `正在加入房间“${code}”…`);
     });
 
   const retryConnect = () =>
     run(async () => {
       await api.post('/api/relay/reconnect');
-      toast('Reconnecting to relay…');
+      toast('正在重新连接中继…');
     });
   const leaveRoom = () => {
     codeDraft = '';
-    return run(() => saveSettings({ syncCode: '' }), 'Left the relay room');
+    return run(() => saveSettings({ syncCode: '' }), '已退出中继房间');
   };
   const pairWan = (p) =>
-    run(() => api.post('/api/peers/pair', { peerId: p.id, address: 'relay' }), `Pairing request sent to ${p.deviceName}`);
+    run(() => api.post('/api/peers/pair', { peerId: p.id, address: 'relay' }), `配对请求已发送至 ${p.deviceName}`);
 
   async function checkHealth() {
     health = null;
@@ -114,13 +114,13 @@
 
   function copyCode() {
     navigator.clipboard?.writeText($wanRoom?.roomCode ?? codeDraft);
-    toast('Room code copied');
+    toast('房间码已复制');
   }
 </script>
 
 <p class="lead">
-  Sync across the internet with no port forwarding: both devices join the same room code on a relay,
-  and the connection to it is encrypted. The relay stores nothing — no copy of a save is written to it.
+  无需端口转发即可跨互联网同步：两台设备在中继上加入同一房间码，且与中继的连接是加密的。
+  中继不存储任何内容——不会向其写入任何存档副本。
 </p>
 
 <!-- Said here, at the point where somebody decides whether to use the public
@@ -135,11 +135,10 @@
      deciding whether to trust a relay deserves the actual boundary, not a
      reassuring version of it. -->
 <p class="lead subtle">
-  Saves are sealed between your two devices, so the relay passes on data it cannot read — not even
-  ours. It can still see that two devices are talking, roughly how much data moves, and which games
-  by id. Running
-  <a href="https://github.com/Liquid-co/OpenSave/blob/main/docs/RELAY.md" target="_blank" rel="noreferrer">your own relay</a>
-  keeps that from us too.
+  存档在你的两台设备之间加密封存，中继转发的数据它自己也无法读取——连我们也一样。它仍能看到有两台
+  设备在通信、大致的数据量，以及按 id 划分的游戏。运行
+  <a href="https://github.com/Liquid-co/OpenSave/blob/main/docs/RELAY.md" target="_blank" rel="noreferrer">你自己的中继</a>
+  可以把这部分信息也从我们这里隐去。
 </p>
 
 <!-- Stated as a plain instruction rather than a condition the reader has to
@@ -149,10 +148,9 @@
      let someone on the previous version conclude this did not apply to them.
      It applied to all of them. -->
 <p class="lead subtle">
-  Both devices need a recent version for this, and internet pairings made before it need to be made
-  again: pairing over a relay never kept the key, so an older pair still sends in the clear. Unpair
-  and pair those two devices again to protect them. Pairings made over a local network kept their key
-  and are unaffected.
+  两台设备都需要较新版本才能使用此功能，且在此之前建立的互联网配对需要重新配对：通过中继配对从未
+  保留密钥，因此旧配对仍以明文发送。请先取消配对，再重新配对这两台设备以获得保护。通过本地网络
+  建立的配对保留了密钥，不受影响。
 </p>
 
 <!-- Always-visible connection status: exactly one of four states. Keyed
@@ -162,16 +160,16 @@
   <div class="status idle">
     <span class="status-dot gray"></span>
     <div class="status-text">
-      <strong>Not in a room</strong>
-      <span>Enter a room code below and press <strong>Join room</strong> to start syncing over the internet.</span>
+      <strong>未加入房间</strong>
+      <span>在下方输入房间码并点击<strong>加入房间</strong>，即可开始通过互联网同步。</span>
     </div>
   </div>
 {:else if $wanRoom?.connected}
   <div class="status ok">
     <span class="status-dot green"></span>
     <div class="status-text">
-      <strong>In room “{$wanRoom.roomCode}”</strong>
-      <span>{roomPeers.length === 0 ? 'Waiting for your other device to join with the same code.' : `${roomPeers.length} other device${roomPeers.length === 1 ? '' : 's'} here.`}</span>
+      <strong>已加入房间“{$wanRoom.roomCode}”</strong>
+      <span>{roomPeers.length === 0 ? '等待你的另一台设备使用相同房间码加入。' : `${roomPeers.length} 台其他设备在此。`}</span>
       <!-- Said at the moment of joining, because that is when it matters:
            every device in a room receives every other device's traffic, so
            whether that traffic is readable is part of what joining means. -->
@@ -181,25 +179,22 @@
              forward-looking fact, and conditional on both devices being on a
              version that exchanges keys over a relay — earlier ones did not. -->
         <span class="encryption-line">
-          <Lock size={14} class="inline-icon" />Devices you pair here sync encrypted end to end, so nobody else holding this
-          code — including the relay — can read your saves. Both devices need this version;
-          each one shows its own state here and under Devices once it's paired.
+          <Lock size={14} class="inline-icon" />在此配对的设备会进行端到端加密同步，持有此房间码的其他任何人——包括中继——
+          都无法读取你的存档。两台设备都需要此版本；配对后，各设备会在此处和“设备”页面显示各自的状态。
         </span>
       {:else}
         <span class="encryption-line">
           {#if unprotectedPeers.length === 0}
-            <Lock size={14} class="inline-icon" />Saves to
-            {relayPeers.length === 1 ? 'your other device' : `all ${relayPeers.length} of your devices`}
-            here are encrypted — nobody else in this room can read them.
+            <Lock size={14} class="inline-icon" />发往
+            {relayPeers.length === 1 ? '你的另一台设备' : `全部 ${relayPeers.length} 台设备`}
+            的存档均已加密——本房间中的其他任何人都无法读取。
           {:else if encryptedPeers.length === 0}
-            <LockOpen size={14} class="inline-icon warn-icon" />Saves sent through this room are <strong>not encrypted</strong>, so anyone
-            holding this room code can read them. Pair
-            {unprotectedPeers.length === 1 ? `“${unprotectedPeers[0].name}”` : 'those devices'}
-            again to fix it.
+            <LockOpen size={14} class="inline-icon warn-icon" />通过本房间发送的存档<strong>未加密</strong>，任何持有此房间码的人都能读取。请重新配对
+            {unprotectedPeers.length === 1 ? `“${unprotectedPeers[0].name}”` : '这些设备'}
+            以修复。
           {:else}
-            <LockOpen size={14} class="inline-icon warn-icon" />{encryptedPeers.length} of {relayPeers.length} paired devices here are
-            encrypted. Pair the {unprotectedPeers.length === 1 ? 'other one' : 'others'} again to
-            protect {unprotectedPeers.length === 1 ? 'it' : 'them'} too.
+            <LockOpen size={14} class="inline-icon warn-icon" />此处已配对的 {relayPeers.length} 台设备中有 {encryptedPeers.length} 台已加密。
+            请重新配对{unprotectedPeers.length === 1 ? '另一台' : '其余设备'}，使其也受到保护。
           {/if}
         </span>
       {/if}
@@ -209,77 +204,76 @@
   <div class="status wait">
     <span class="sspin"></span>
     <div class="status-text">
-      <strong>Connecting to relay…</strong>
-      <span>Free-hosted relays can take up to a minute to wake from sleep — hang tight, we retry automatically.</span>
+      <strong>正在连接中继…</strong>
+      <span>免费托管的中继从休眠唤醒可能需要一分钟——请稍候，我们会自动重试。</span>
     </div>
   </div>
 {:else}
   <div class="status err">
     <span class="status-dot red"></span>
     <div class="status-text">
-      <strong>Not connected</strong>
-      <span>{$wanRoom?.error ?? 'The relay connection is down.'} Retrying automatically every few seconds.</span>
+      <strong>未连接</strong>
+      <span>{$wanRoom?.error ?? '中继连接已断开。'} 每隔几秒自动重试。</span>
     </div>
-    <button class="btn small" disabled={busy} on:click={retryConnect}>Retry now</button>
+    <button class="btn small" disabled={busy} on:click={retryConnect}>立即重试</button>
   </div>
 {/if}
 
 <div class="card">
-  <h3>Relay room</h3>
+  <h3>中继房间</h3>
   <div class="row">
     <div class="field grow">
-      <label for="room-code">Room code — share this with your other device</label>
+      <label for="room-code">房间码——请与你的另一台设备共享</label>
       <div class="code-row">
-        <input id="room-code" placeholder="e.g. k7m2-9xqp-4wnt" bind:value={codeDraft} />
-        <button class="btn icon" on:click={randomCode} title="Make up a random code" aria-label="Random code"><Dices size={17} /></button>
+        <input id="room-code" placeholder="例如 k7m2-9xqp-4wnt" bind:value={codeDraft} />
+        <button class="btn icon" on:click={randomCode} title="生成随机房间码" aria-label="随机房间码"><Dices size={17} /></button>
         {#if $wanRoom?.enabled}
-          <button class="btn" on:click={copyCode}>Copy</button>
+          <button class="btn" on:click={copyCode}>复制</button>
         {/if}
       </div>
     </div>
   </div>
   <div class="row">
     <div class="field grow">
-      <label for="relay-url">Relay server (self-hostable)</label>
+      <label for="relay-url">中继服务器（可自建）</label>
       <!-- Pinned by the environment: shown, because it is the relay actually
            in use, but not editable, because typing here would be discarded. -->
       <input id="relay-url" bind:value={relayDraft} readonly={$settings?.relayUrlLocked} />
       {#if $settings?.relayUrlLocked}
         <span class="hint">
-          Set by the <code>OPENSAVE_RELAY_URL</code> environment variable, so it can't be changed
-          here. Change the variable and restart OpenSave, or unset it to go back to the saved
-          setting.
+          由环境变量 <code>OPENSAVE_RELAY_URL</code> 设置，因此无法在此修改。请更改该变量并重启
+          OpenSave，或取消该变量以恢复保存的设置。
         </span>
       {:else}
-        <span class="hint">Run your own with the opensave-relay binary and point this at it.</span>
+        <span class="hint">可用 opensave-relay 程序运行自己的中继，并将此地址指向它。</span>
       {/if}
     </div>
   </div>
   <div class="actions">
-    <button class="btn" on:click={checkHealth}>Test relay</button>
+    <button class="btn" on:click={checkHealth}>测试中继</button>
     {#if $wanRoom?.enabled}
-      <button class="btn danger" disabled={busy} on:click={leaveRoom}>Leave room</button>
+      <button class="btn danger" disabled={busy} on:click={leaveRoom}>退出房间</button>
     {/if}
     <button class="btn primary" disabled={busy} on:click={joinRoom}>
-      {$wanRoom?.enabled ? 'Update' : 'Join room'}
+      {$wanRoom?.enabled ? '更新' : '加入房间'}
     </button>
   </div>
   {#if health}
     <div class="health with-icon" class:ok={health.reachable}>
       {#if health.reachable}
-        <CircleCheck size={16} /> Relay reachable — {plural(health.health?.clients ?? 0, 'device')} connected, in {plural(health.health?.rooms ?? 0, 'room')}
+        <CircleCheck size={16} /> 中继可达——已连接 {health.health?.clients ?? 0} 台设备，共 {health.health?.rooms ?? 0} 个房间
       {:else}
-        <CircleX size={16} /> Relay unreachable: {health.error}
+        <CircleX size={16} /> 中继不可达：{health.error}
       {/if}
     </div>
   {/if}
 </div>
 
 {#if $wanRoom?.enabled}
-  <h3 class="section">In this room</h3>
+  <h3 class="section">房间内设备</h3>
   {#if roomPeers.length === 0}
     <p class="quiet">
-      No other devices in the room yet. Enter the same code on your other device and it will appear here.
+      房间内暂无其他设备。在另一台设备上输入相同房间码，它就会出现在这里。
     </p>
   {:else}
     <div class="list">
@@ -289,13 +283,13 @@
           <div class="peer-info">
             <div class="peer-name">
               {p.deviceName}
-              <span class="badge" class:online={p.online} class:offline={!p.online}>{p.online ? 'online' : 'away'}</span>
+              <span class="badge" class:online={p.online} class:offline={!p.online}>{p.online ? '在线' : '离开'}</span>
             </div>
           </div>
           {#if p.paired || pairedIds.has(p.id)}
-            <span class="badge online">paired</span>
+            <span class="badge online">已配对</span>
           {:else}
-            <button class="btn small primary" disabled={busy} on:click={() => pairWan(p)}>Pair</button>
+            <button class="btn small primary" disabled={busy} on:click={() => pairWan(p)}>配对</button>
           {/if}
         </div>
       {/each}

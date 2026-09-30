@@ -80,7 +80,7 @@ func (a *App) startup(ctx context.Context) {
 		a.updatedFrom = ""
 	}
 	if a.updatedFrom != "" {
-		d.Log.Log("success", "OpenSave updated: "+a.updatedFrom+" → "+AppVersion)
+		d.Log.Log("success", "OpenSave 已更新："+a.updatedFrom+" → "+AppVersion)
 	}
 
 	settings, err := d.Store.GetSettings()
@@ -116,7 +116,7 @@ func (a *App) startup(ctx context.Context) {
 	// fetch" on every call.
 	if conn, dialErr := net.DialTimeout("tcp", addr, 3*time.Second); dialErr != nil {
 		a.bootErr = fmt.Sprintf(
-			"the app's local service started on %s but this machine blocks connections to it (%v) — check firewall/security software",
+			"应用的本地服务已在 %s 启动，但本机阻止了对它的连接（%v）——请检查防火墙/安全软件",
 			addr, dialErr)
 		d.Log.Log("error", a.bootErr)
 		return
@@ -125,7 +125,7 @@ func (a *App) startup(ctx context.Context) {
 	}
 
 	a.addr = addr
-	d.Log.Log("info", "desktop app connected to daemon at "+addr)
+	d.Log.Log("info", "桌面应用已连接守护进程 "+addr)
 
 	a.initNotifications()
 	a.startTray()
@@ -137,7 +137,7 @@ func (a *App) startup(ctx context.Context) {
 	// healthy install this reads one registry value and stops.
 	if settings.StartOnBoot {
 		if err := sysintegration.SetAutostart(true); err != nil {
-			d.Log.Log("warn", "could not refresh the start-with-system entry: "+err.Error())
+			d.Log.Log("warn", "无法刷新开机自启项："+err.Error())
 		}
 	} else if sysintegration.AutostartEnabled() {
 		// The other direction: something outside the app turned it on. The
@@ -148,9 +148,9 @@ func (a *App) startup(ctx context.Context) {
 		// turning it "on" and off again would be the only way to fix it.
 		settings.StartOnBoot = true
 		if err := d.Store.UpdateSettings(settings); err != nil {
-			d.Log.Log("warn", "could not record that start-with-system is on: "+err.Error())
+			d.Log.Log("warn", "无法记录开机自启已开启的状态："+err.Error())
 		} else {
-			d.Log.Log("info", "start-with-system was switched on outside the app; Settings now agrees")
+			d.Log.Log("info", "开机自启在应用外被开启；设置页现已同步")
 		}
 	}
 
@@ -200,7 +200,7 @@ func (a *App) AppInfo() map[string]string {
 		"name":      "OpenSave",
 		"version":   AppVersion,
 		"buildTime": strconv.FormatInt(version.BuildTimeMs(), 10),
-		"tagline":   "Peer-to-peer game save sync",
+		"tagline":   "点对点游戏存档同步",
 		"license":   "MIT",
 		"copyright": "© 2026 Siva Prakash & OpenSave contributors",
 		"tech":      "Go + Wails",
@@ -248,7 +248,7 @@ func (a *App) DaemonAddr() map[string]string {
 // SelectDirectory opens the native folder picker.
 func (a *App) SelectDirectory(title string) string {
 	if title == "" {
-		title = "Select folder"
+		title = "选择文件夹"
 	}
 	dir, err := runtime.OpenDirectoryDialog(a.ctx, runtime.OpenDialogOptions{Title: title})
 	if err != nil {
@@ -260,13 +260,13 @@ func (a *App) SelectDirectory(title string) string {
 // SelectFile opens the native file picker (executables for game launch).
 func (a *App) SelectFile(title string) string {
 	if title == "" {
-		title = "Select file"
+		title = "选择文件"
 	}
 	file, err := runtime.OpenFileDialog(a.ctx, runtime.OpenDialogOptions{
 		Title: title,
 		Filters: []runtime.FileFilter{
-			{DisplayName: "Programs (*.exe;*.bat)", Pattern: "*.exe;*.bat"},
-			{DisplayName: "All files", Pattern: "*.*"},
+			{DisplayName: "程序 (*.exe;*.bat)", Pattern: "*.exe;*.bat"},
+			{DisplayName: "所有文件", Pattern: "*.*"},
 		},
 	})
 	if err != nil {
@@ -279,13 +279,13 @@ func (a *App) SelectFile(title string) string {
 // backup files (import source).
 func (a *App) SelectBackupFile(title string) string {
 	if title == "" {
-		title = "Select backup file"
+		title = "选择备份文件"
 	}
 	file, err := runtime.OpenFileDialog(a.ctx, runtime.OpenDialogOptions{
 		Title: title,
 		Filters: []runtime.FileFilter{
-			{DisplayName: "OpenSave backup (*.sscb)", Pattern: "*.sscb"},
-			{DisplayName: "All files", Pattern: "*.*"},
+			{DisplayName: "OpenSave 备份 (*.sscb)", Pattern: "*.sscb"},
+			{DisplayName: "所有文件", Pattern: "*.*"},
 		},
 	})
 	if err != nil {
@@ -300,7 +300,7 @@ func (a *App) SelectSaveFile(title, defaultName string) string {
 		Title:           title,
 		DefaultFilename: defaultName,
 		Filters: []runtime.FileFilter{
-			{DisplayName: "OpenSave backup (*.sscb)", Pattern: "*.sscb"},
+			{DisplayName: "OpenSave 备份 (*.sscb)", Pattern: "*.sscb"},
 		},
 	})
 	if err != nil {
@@ -338,7 +338,7 @@ func (a *App) OpenFolder(path string) string {
 		cmd = exec.Command("xdg-open", dir)
 	}
 	if err := cmd.Start(); err != nil {
-		return "Could not open the file manager: " + err.Error()
+		return "无法打开文件管理器：" + err.Error()
 	}
 	// Explorer exits non-zero even when it succeeded, so the result is
 	// deliberately not waited on or inspected.
@@ -352,14 +352,14 @@ func (a *App) OpenFolder(path string) string {
 // A save tracked as a single file resolves to its containing folder.
 func revealTargetDir(path string) (dir, problem string) {
 	if strings.TrimSpace(path) == "" {
-		return "", "No save location set for this game."
+		return "", "此游戏尚未设置存档位置。"
 	}
 	info, err := os.Stat(path)
 	if err != nil {
 		if os.IsNotExist(err) {
-			return "", "That folder no longer exists on this device."
+			return "", "该文件夹在此设备上已不存在。"
 		}
-		return "", "Could not open the folder: " + err.Error()
+		return "", "无法打开文件夹：" + err.Error()
 	}
 	if info.IsDir() {
 		return filepath.Clean(path), ""

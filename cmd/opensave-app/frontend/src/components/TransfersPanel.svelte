@@ -46,21 +46,21 @@
   }
 </script>
 
-<div class="panel" role="dialog" aria-label="Transfers">
+<div class="panel" role="dialog" aria-label="传输">
   <div class="head">
-    <h3>Transfers</h3>
-    <button class="btn small ghost icon" aria-label="Close" title="Close" on:click={() => dispatch('close')}><X size={14} /></button>
+    <h3>传输</h3>
+    <button class="btn small ghost icon" aria-label="关闭" title="关闭" on:click={() => dispatch('close')}><X size={14} /></button>
   </div>
 
   {#if error}
-    <p class="empty">Couldn't read transfers: {error}</p>
+    <p class="empty">无法读取传输记录：{error}</p>
   {:else if !data}
     <div class="skeleton" style="height: 44px; margin: 10px 14px"></div>
   {:else if shown.active.length === 0 && shown.recent.length === 0}
-    <p class="empty">Nothing has moved between your devices since OpenSave started.</p>
+    <p class="empty">自 OpenSave 启动以来，设备之间还没有传输过内容。</p>
   {:else}
     {#if shown.active.length}
-      <h4>Now</h4>
+      <h4>正在进行</h4>
       {#each shown.active as t}
         <button class="row" on:click={() => open(t)}>
           <span class="dir {t.direction}"><svelte:component this={t.direction === 'upload' ? ArrowUp : ArrowDown} size={14} /></span>
@@ -74,7 +74,7 @@
       {/each}
     {/if}
     {#if shown.recent.length}
-      <h4>Recently</h4>
+      <h4>最近</h4>
       {#each shown.recent.slice(0, 20) as t}
         <button class="row" on:click={() => open(t)} title={t.error || ''}>
           <span class="dir {t.direction}"><svelte:component this={t.direction === 'upload' ? ArrowUp : ArrowDown} size={14} /></span>

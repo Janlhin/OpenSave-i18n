@@ -71,19 +71,19 @@
   $: online = paired.filter((p) => p.status === 'online');
   $: devices =
     paired.length === 0
-      ? 'None paired'
+      ? '未配对任何设备'
       : paired.length === 1
-        ? `${paired[0].name} · ${online.length ? 'online' : 'offline'}`
-        : `${online.length} of ${paired.length} online`;
+        ? `${paired[0].name} · ${online.length ? '在线' : '离线'}`
+        : `${paired.length} 台中 ${online.length} 台在线`;
 
   // Set up, not just switched on: a fresh install has backup on with no
   // folder chosen, which backs up nothing.
   $: cloudOn = !!$settings?.cloudSync?.ready;
   $: cloud = cloudOn
-    ? (providerById($settings.cloudSync.provider)?.label ?? 'On')
+    ? (providerById($settings.cloudSync.provider)?.label ?? '已开启')
     : $settings?.cloudSync?.enabled
-      ? 'Not set up'
-      : 'Off';
+      ? '未完成配置'
+      : '已关闭';
 
   $: space = spaceUsed(Object.fromEntries(rows.map((r) => [r.game.id, r.game])));
 
@@ -100,41 +100,40 @@
       <p class="headline" role="status">{summary.headline}</p>
       {#if lowSpace !== null}
         <p class="detail warn">
-          Only {fmtSize(lowSpace)} free on the drive your snapshots are kept on — new ones may not fit.
-          <button class="inline-link" on:click={() => navigate('settings', { tab: 'storage' })}>See what takes the space</button>
+          存放快照的驱动器仅剩 {fmtSize(lowSpace)} 可用空间 — 新快照可能放不下。
+          <button class="inline-link" on:click={() => navigate('settings', { tab: 'storage' })}>查看空间占用</button>
         </p>
       {/if}
       {#if paused}
         <p class="detail">
-          Syncing is paused {pauseLength($syncPause, now)}. Snapshots are still taken, and everything catches up when it
-          resumes.
+          同步已暂停{pauseLength($syncPause, now)}。快照仍会照常生成，恢复后一切会自动补齐。
         </p>
       {/if}
     </div>
     {#if paused}
-      <button class="btn small" on:click={resumeSync}>Resume now</button>
+      <button class="btn small" on:click={resumeSync}>立即恢复</button>
     {/if}
   </div>
 
   <div class="facts">
-    <button class="fact link" on:click={() => navigate('devices')} title="Open Devices">
-      <span class="label">Devices</span>
+    <button class="fact link" on:click={() => navigate('devices')} title="打开设备页">
+      <span class="label">设备</span>
       <span class="value" class:quiet={paired.length === 0}><span class="v">{devices}</span><ChevronRight size={13} class="go" /></span>
     </button>
-    <button class="fact link" on:click={() => navigate('cloud')} title="Open Cloud Backup">
-      <span class="label">Cloud backup</span>
+    <button class="fact link" on:click={() => navigate('cloud')} title="打开云备份">
+      <span class="label">云备份</span>
       <span class="value" class:quiet={!cloudOn}><span class="v">{cloud}</span><ChevronRight size={13} class="go" /></span>
     </button>
     <div class="fact" title={newest ? `${newest.name} · ${new Date(newest.at).toLocaleString()}` : ''}>
-      <span class="label">Last snapshot</span>
-      <span class="value" class:quiet={!newest}><span class="v">{newest ? timeAgo(newest.at, now) : 'None yet'}</span></span>
+      <span class="label">最近快照</span>
+      <span class="value" class:quiet={!newest}><span class="v">{newest ? timeAgo(newest.at, now) : '还没有'}</span></span>
     </div>
     <button
       class="fact link"
       on:click={() => navigate('settings', { tab: 'storage' })}
-      title={sharedSaving > 0 ? `On disk — ${fmtSize(sharedSaving)} less than the snapshots' own sizes, for sharing unchanged files. Open Settings → Storage` : 'Open Settings → Storage'}
+      title={sharedSaving > 0 ? `磁盘占用 — 通过共享未变化的文件，比快照自身大小之和少 ${fmtSize(sharedSaving)}。打开设置 → 存储` : '打开设置 → 存储'}
     >
-      <span class="label">Space used</span>
+      <span class="label">已用空间</span>
       <span class="value"><span class="v">{fmtSize(Math.max(0, space - sharedSaving))}</span><ChevronRight size={13} class="go" /></span>
     </button>
   </div>

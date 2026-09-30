@@ -94,13 +94,13 @@
   let rejected = {};
   let refusedWhy = {};
   const FIELD_NAMES = {
-    relayUrl: 'relay URL',
-    relayPort: 'relay hosting port',
-    port: 'daemon port',
-    deviceName: 'device name',
-    backupsDir: 'snapshots folder',
-    syncBackupsDir: 'safety backups folder',
-    pathTranslations: 'path rules'
+    relayUrl: '中继 URL',
+    relayPort: '中继托管端口',
+    port: '守护进程端口',
+    deviceName: '设备名称',
+    backupsDir: '快照文件夹',
+    syncBackupsDir: '安全备份文件夹',
+    pathTranslations: '路径规则'
   };
   $: unsaved = draft ? Object.keys(rejected).filter((key) => same(draft[key], rejected[key])) : [];
   const firstSentence = (text) => String(text).split(/(?<=\.)\s/)[0];
@@ -174,13 +174,13 @@
     try {
       // Save the limit first so the cleanup uses it, then prune everything.
       await saver.flush();
-      if (saveState?.error) throw new Error(`the limits couldn't be saved: ${saveState.error}`);
+      if (saveState?.error) throw new Error(`无法保存这些限制：${saveState.error}`);
       const res = await api.post('/api/snapshots/prune', { applyDefaultToAll: true });
       const mb = (res.freedBytes / 1048576).toFixed(1);
       toast(
         res.removed > 0
-          ? `Removed ${res.removed} old snapshot${res.removed === 1 ? '' : 's'}, freed ${mb} MB`
-          : 'Nothing to clean up — all games are within their limit',
+          ? `已删除 ${res.removed} 个旧快照，释放 ${mb} MB`
+          : '无需清理——所有游戏均在限额之内',
         'success'
       );
     } catch (e) {
@@ -201,7 +201,7 @@
 
   // Custom scan paths
   async function addScanPath() {
-    const dir = await native.selectDirectory('Add a folder to scan');
+    const dir = await native.selectDirectory('添加要扫描的文件夹');
     if (dir) draft.customScanPaths = [...(draft.customScanPaths ?? []), dir];
     saveNow();
   }
@@ -212,7 +212,7 @@
 
   // Excluded folders — locations the scan should skip entirely.
   async function addExcludePath() {
-    const dir = await native.selectDirectory('Choose a folder to exclude from scans');
+    const dir = await native.selectDirectory('选择要从扫描中排除的文件夹');
     if (dir) draft.excludePaths = [...(draft.excludePaths ?? []), dir];
     saveNow();
   }
@@ -230,14 +230,14 @@
     const n = $gameList.length;
     if (n === 0) return;
     const ok = await askConfirm(
-      `Untrack all ${n} game${n === 1 ? '' : 's'}? They'll be removed from your library so you can re-add them from the correct locations. Your save snapshots on disk are kept — nothing is deleted.`,
-      { title: 'Reset tracking?', confirmText: `Untrack ${n}`, danger: true }
+      `取消跟踪全部 ${n} 个游戏？它们将从你的游戏库中移除，以便之后从正确的位置重新添加。磁盘上的存档快照会保留——不会删除任何内容。`,
+      { title: '重置跟踪？', confirmText: `取消跟踪 ${n}`, danger: true }
     );
     if (!ok) return;
     resetting = true;
     try {
       const res = await api.post('/api/games/untrack-bulk', { all: true });
-      toast(`Untracked ${res.untracked} game${res.untracked === 1 ? '' : 's'} — snapshots kept`, 'success');
+      toast(`已取消跟踪 ${res.untracked} 个游戏——快照已保留`, 'success');
     } catch (e) {
       toast(e.message, 'error');
     } finally {
@@ -246,13 +246,13 @@
   }
 
   async function pickBackupsDir() {
-    const dir = await native.selectDirectory('Select snapshots storage folder');
+    const dir = await native.selectDirectory('选择快照存储文件夹');
     if (dir) draft.backupsDir = dir;
     saveNow();
   }
 
   async function pickSyncBackupsDir() {
-    const dir = await native.selectDirectory('Select pre-sync safety backups folder');
+    const dir = await native.selectDirectory('选择同步前安全备份文件夹');
     if (dir) draft.syncBackupsDir = dir;
     saveNow();
   }
@@ -287,22 +287,22 @@
 </script>
 
 <div class="head">
-  <h2 class="page-title">Settings</h2>
+  <h2 class="page-title">设置</h2>
   {#if draft}
     <span class="save-state" class:error={saveState?.error || unsaved.length} aria-live="polite">
       {#if saveState === 'saving'}
-        <LoaderCircle size={14} class="spin" />Saving…
+        <LoaderCircle size={14} class="spin" />保存中…
       {:else if unsaved.length}
         <TriangleAlert size={14} />
         <span class="why" title={refusedWhy[unsaved[0]]}>
-          Not saved: the {FIELD_NAMES[unsaved[0]] ?? unsaved[0]} — {firstSentence(refusedWhy[unsaved[0]])}
+          未保存：{FIELD_NAMES[unsaved[0]] ?? unsaved[0]}——{firstSentence(refusedWhy[unsaved[0]])}
         </span>
       {:else if saveState?.error}
-        <TriangleAlert size={14} /><span class="why" title={saveState.error}>Couldn't save: {firstSentence(saveState.error)}</span>
+        <TriangleAlert size={14} /><span class="why" title={saveState.error}>无法保存：{firstSentence(saveState.error)}</span>
       {:else if saveState === 'saved'}
-        <Check size={14} />Saved
+        <Check size={14} />已保存
       {:else}
-        Changes save as you make them
+        更改会即时保存
       {/if}
     </span>
   {/if}
@@ -312,14 +312,14 @@
   <Skeleton kind="cards" count={3} />
 {:else}
   <div class="pill-tabs" style="margin-bottom: 18px;" use:slidingIndicator={{ inset: 10 }}>
-    <button class:active={tab === 'general'} on:click={() => showTab('general')}>General</button>
-    <button class:active={tab === 'sync'} on:click={() => showTab('sync')}>Sync</button>
-    <button class:active={tab === 'storage'} on:click={() => showTab('storage')}>Storage</button>
-    <button class:active={tab === 'advanced'} on:click={() => showTab('advanced')}>Advanced</button>
-    <button class="support-tab" class:active={tab === 'support'} on:click={() => showTab('support')}><Heart size={14} />Support</button>
+    <button class:active={tab === 'general'} on:click={() => showTab('general')}>常规</button>
+    <button class:active={tab === 'sync'} on:click={() => showTab('sync')}>同步</button>
+    <button class:active={tab === 'storage'} on:click={() => showTab('storage')}>存储</button>
+    <button class:active={tab === 'advanced'} on:click={() => showTab('advanced')}>高级</button>
+    <button class="support-tab" class:active={tab === 'support'} on:click={() => showTab('support')}><Heart size={14} />支持</button>
     <!-- Not a tab: it leaves the app. Shaped like its neighbour so the pair
          reads as one group, marked with an outward arrow so nobody expects a panel. -->
-    <button class="discord-tab" on:click={() => native.openExternal(DISCORD_URL)} title="Open the OpenSave Discord in your browser">
+    <button class="discord-tab" on:click={() => native.openExternal(DISCORD_URL)} title="在浏览器中打开 OpenSave Discord">
       <span class="discord-glyph" aria-hidden="true">
         <svg viewBox="0 0 24 18" width="17" height="13" fill="currentColor">
           <path d="M20.32 1.53A19.8 19.8 0 0 0 15.43 0c-.21.38-.46.9-.63 1.31a18.3 18.3 0 0 0-5.6 0C9.03.9 8.77.38 8.56 0A19.74 19.74 0 0 0 3.67 1.53C.57 6.19-.27 10.73.15 15.21A19.9 19.9 0 0 0 6.18 18c.49-.66.92-1.37 1.29-2.11-.71-.27-1.39-.6-2.03-.98.17-.13.34-.26.5-.4a14.2 14.2 0 0 0 12.12 0c.16.14.33.27.5.4-.64.38-1.32.71-2.03.98.37.74.8 1.45 1.29 2.11a19.87 19.87 0 0 0 6.03-2.79c.5-5.19-.84-9.69-3.53-13.68ZM8.02 12.46c-1.18 0-2.15-1.08-2.15-2.4s.95-2.4 2.15-2.4c1.2 0 2.17 1.09 2.15 2.4 0 1.32-.95 2.4-2.15 2.4Zm7.96 0c-1.18 0-2.15-1.08-2.15-2.4s.95-2.4 2.15-2.4c1.2 0 2.17 1.09 2.15 2.4 0 1.32-.95 2.4-2.15 2.4Z" />
@@ -340,188 +340,182 @@
   >
   {#if tab === 'general'}
     <div class="card">
-      <h3 class="section-title with-icon"><Monitor size={17} />Device identity</h3>
+      <h3 class="section-title with-icon"><Monitor size={17} />设备身份</h3>
       <div class="field">
-        <label for="s-name">Device name — how other devices see you</label>
+        <label for="s-name">设备名称——其他设备看到的名字</label>
         <input id="s-name" class:invalid={unsaved.includes('deviceName')} bind:value={draft.deviceName} />
       </div>
       <div class="field">
-        <label for="s-type">Device type</label>
+        <label for="s-type">设备类型</label>
         <select id="s-type" bind:value={draft.deviceType}>
-          <option value="desktop">Desktop (Windows / macOS / Linux PC)</option>
-          <option value="deck">Steam Deck (SteamOS handheld)</option>
-          <option value="handheld">Handheld (ROG Ally / Legion Go / emulator)</option>
-          <option value="mobile">Companion (mobile device)</option>
+          <option value="desktop">台式机（Windows / macOS / Linux 电脑）</option>
+          <option value="deck">Steam Deck（SteamOS 掌机）</option>
+          <option value="handheld">掌机（ROG Ally / Legion Go / 模拟器）</option>
+          <option value="mobile">伴侣设备（移动设备）</option>
         </select>
-        <span class="hint">Shown to other devices when they discover you.</span>
+        <span class="hint">在其他设备发现你时显示。</span>
       </div>
       <div class="field">
-        <label for="s-node">Device ID</label>
+        <label for="s-node">设备 ID</label>
         <input id="s-node" value={draft.nodeId ?? ''} readonly class="mono" />
-        <span class="hint">This device's unique network identifier (read-only).</span>
+        <span class="hint">本设备的唯一网络标识符（只读）。</span>
       </div>
     </div>
 
     <!-- Kept on this device rather than in the daemon's settings, like the
          library view below. -->
     <div class="card" style="margin-top: 14px;">
-      <h3 class="section-title with-icon"><Palette size={17} />Appearance</h3>
+      <h3 class="section-title with-icon"><Palette size={17} />外观</h3>
       <AppearanceOptions />
     </div>
 
     <!-- Using OpenSave from a gamepad: a Steam Deck, a handheld, a pad on a
          PC. Also on this device only. -->
     <div class="card" style="margin-top: 14px;">
-      <h3 class="section-title with-icon"><Gamepad2 size={17} />Controller</h3>
+      <h3 class="section-title with-icon"><Gamepad2 size={17} />手柄</h3>
       <ControllerOptions />
     </div>
 
     <div class="card" style="margin-top: 14px;">
-      <h3 class="section-title with-icon"><Bell size={17} />Notifications</h3>
+      <h3 class="section-title with-icon"><Bell size={17} />通知</h3>
       <NotificationOptions />
     </div>
 
     <!-- The same thing the View menu on the library changes, kept on this
          device: see lib/libraryview.js for why. -->
     <div class="card" style="margin-top: 14px;">
-      <h3 class="section-title with-icon"><LayoutGrid size={17} />Library</h3>
-      <p class="hint library-hint">How your games are laid out on Home. Changes apply straight away.</p>
+      <h3 class="section-title with-icon"><LayoutGrid size={17} />游戏库</h3>
+      <p class="hint library-hint">游戏在主页上的排列方式。更改立即生效。</p>
       <LibraryViewOptions />
       <div class="guide-row">
         <div>
-          <strong>Setup guide</strong>
-          <p class="hint">The getting-started checklist on Home: find your saves, add your other devices, back up to the cloud.</p>
+          <strong>设置向导</strong>
+          <p class="hint">主页上的入门清单：找到你的存档、添加其他设备、备份到云端。</p>
         </div>
-        <button class="btn small" on:click={() => { showSetupAgain(); navigate('home'); }}>Show it again</button>
+        <button class="btn small" on:click={() => { showSetupAgain(); navigate('home'); }}>再次显示</button>
       </div>
     </div>
 
     <div class="card" style="margin-top: 14px;">
-      <h3 class="section-title with-icon"><Rocket size={17} />Startup</h3>
+      <h3 class="section-title with-icon"><Rocket size={17} />启动</h3>
       <label class="check">
         <input type="checkbox" bind:checked={draft.startOnBoot} />
-        Start OpenSave when the computer starts
+        开机时启动 OpenSave
       </label>
       <p class="hint" style="margin-top: 6px;">
-        Launches minimized to the system tray so syncing runs in the background.
+        启动时最小化到系统托盘，让同步在后台运行。
       </p>
     </div>
 
     <div class="card" style="margin-top: 14px;">
-      <h3 class="section-title with-icon"><Download size={17} />Updates</h3>
+      <h3 class="section-title with-icon"><Download size={17} />更新</h3>
       <label class="check">
         <input
           type="checkbox"
           checked={draft.updateChannel === 'beta'}
           on:change={(e) => (draft.updateChannel = e.currentTarget.checked ? 'beta' : 'stable')}
         />
-        Offer me beta versions
+        向我提供测试版
       </label>
       <p class="hint" style="margin-top: 6px;">
         {#if onPreRelease}
-          You're running <strong>{appVersion}</strong>, which is a beta, so you'll be offered newer
-          betas whether or not this is ticked — otherwise there'd be no way forward until the final
-          release caught up. Untick it and you'll move to the stable release as soon as it's newer
-          than what you have.
+          你正在运行 <strong>{appVersion}</strong>，这是一个测试版，因此无论是否勾选，都会向你提供更新的
+          测试版——否则在正式版跟上之前你将无法升级。取消勾选后，一旦正式版比你当前的版本更新，你就会
+          切换到正式版。
         {:else}
-          Betas ship early with the newest fixes and are less tested. You'll be offered the stable
-          release whenever it's newer, so this isn't a one-way door.
+          测试版更早发布、包含最新修复，但测试较少。只要正式版更新就会向你提供，因此这不是单向选择。
         {/if}
       </p>
     </div>
 
   {:else if tab === 'sync'}
     <div class="card">
-      <h3 class="section-title with-icon"><RefreshCw size={17} />Sync behavior</h3>
+      <h3 class="section-title with-icon"><RefreshCw size={17} />同步行为</h3>
       <label class="check">
         <input type="checkbox" bind:checked={draft.autoSyncOnTrack} />
-        Sync a game immediately when it's first tracked
+        首次跟踪游戏时立即同步
       </label>
       <label class="check" style="margin-top: 18px;">
         <input type="checkbox" bind:checked={draft.detectNewGames} />
-        Tell me when a game turns up with saves OpenSave isn't keeping
+        当发现 OpenSave 未管理的游戏存档时提醒我
       </label>
       <span class="hint" style="margin-top: 6px;">
-        OpenSave looks every hour, in the background, and only mentions games it hasn't seen before.
-        Nothing is tracked until you choose it.
+        OpenSave 每小时在后台检查一次，只提示未曾见过的游戏。在你选择之前不会跟踪任何内容。
       </span>
       <label class="check" style="margin-top: 18px;">
         <input type="checkbox" bind:checked={draft.matchByAppId} />
-        Match saves across PCs by Steam App ID
+        按 Steam App ID 匹配各电脑间的存档
       </label>
       <span class="hint" style="margin-top: 6px;">
-        Links the same game across devices even when it was tracked under different names or drives.
+        即使同一游戏在不同设备上以不同名称或盘符被跟踪，也能将其关联。
         <MoreInfo>
-          For example a Steam copy on one PC and a standalone copy on another. Leave this off if you
-          deliberately keep two separate copies of the same game that shouldn't merge. You can always
-          link games by hand from a game's page.
+          例如一台电脑上的 Steam 版和另一台上的独立版。如果你有意保留同一游戏的两个不应合并的副本，
+          请关闭此选项。你随时可以在游戏页面手动关联。
         </MoreInfo>
       </span>
         <div class="field" style="margin-top: 18px;">
-          <label for="s-unknown-game">When another device syncs a game this one doesn't have</label>
+          <label for="s-unknown-game">当其他设备同步了本机没有的游戏</label>
           <select id="s-unknown-game" bind:value={draft.unknownGameFromPeer}>
-            <option value="track">Start tracking it automatically (recommended)</option>
-            <option value="ask">Ask me where to keep it</option>
+            <option value="track">自动开始跟踪（推荐）</option>
+            <option value="ask">询问我存放位置</option>
           </select>
           <span class="hint">
-            Tracking automatically works out a folder from where the game lives on the other
-            device, which is why OpenSave usually needs no setup.
+            自动跟踪会根据游戏在其他设备上的位置推算出文件夹，这也是 OpenSave 通常无需配置的原因。
             <MoreInfo>
-              Choose <em>Ask me</em> if your saves are somewhere that guess would get wrong — a
-              second drive, a folder you moved, or a game that keeps saves in a folder named after
-              your account. Games waiting for a folder appear on the Home page.
+              如果自动推算的位置不对——比如第二块硬盘、移动过的文件夹，或存档保存在以你账号命名的
+              文件夹中的游戏——请选择<em>询问我</em>。等待指定位置的游戏会显示在主页上。
             </MoreInfo>
           </span>
         </div>
       <div class="field" style="margin-top: 14px;">
-        <label for="s-limit">Internet bandwidth limit</label>
+        <label for="s-limit">网络带宽限制</label>
         <select id="s-limit" bind:value={draft.speedLimit}>
-          <option value={0}>Unlimited (max speed)</option>
-          <option value={100}>100 KB/s (very low)</option>
-          <option value={500}>500 KB/s (medium)</option>
-          <option value={1024}>1 MB/s (high)</option>
-          <option value={5120}>5 MB/s (very high)</option>
-          <option value={10240}>10 MB/s (ultra)</option>
+          <option value={0}>不限速（最快）</option>
+          <option value={100}>100 KB/s（很低）</option>
+          <option value={500}>500 KB/s（中等）</option>
+          <option value={1024}>1 MB/s（较高）</option>
+          <option value={5120}>5 MB/s（很高）</option>
+          <option value={10240}>10 MB/s（极高）</option>
         </select>
-        <span class="hint">Only applies to relay (internet) syncs — LAN is never throttled.</span>
+        <span class="hint">仅对中继（互联网）同步生效——局域网永不限速。</span>
       </div>
     </div>
 
     <div class="card" style="margin-top: 14px;">
-      <h3 class="section-title with-icon"><Globe size={17} />Internet relay</h3>
+      <h3 class="section-title with-icon"><Globe size={17} />互联网中继</h3>
       <div class="field">
-        <label for="s-relay-url">WebSocket relay URL</label>
+        <label for="s-relay-url">WebSocket 中继 URL</label>
         <input id="s-relay-url" class:invalid={unsaved.includes('relayUrl')} bind:value={draft.relayUrl} placeholder="wss://relay.opensave.org" />
-        <span class="hint">The relay that carries syncs across the internet. Join a room from <strong>Internet Sync</strong>.</span>
+        <span class="hint">承载跨互联网同步的中继。请在<strong>互联网同步</strong>页面加入房间。</span>
       </div>
       <label class="check">
         <input type="checkbox" bind:checked={draft.hostRelay} />
-        Host a WAN relay server on this device
+        在本设备上托管广域网中继服务器
       </label>
       <p class="hint" style="margin-top: 6px;">
-        Lets friends connect directly to you instead of the public relay.
+        让朋友直接连接你，而不使用公共中继。
       </p>
       {#if draft.hostRelay}
         <div class="field" style="margin-top: 12px;">
-          <label for="s-relay-port">Relay hosting port</label>
+          <label for="s-relay-port">中继托管端口</label>
           <input id="s-relay-port" type="number" class:invalid={unsaved.includes('relayPort')} bind:value={draft.relayPort} />
-          <span class="hint">Forward this TCP port on your router so friends on the internet can reach you.</span>
+          <span class="hint">在路由器上转发此 TCP 端口，以便互联网上的朋友能连到你。</span>
         </div>
         <button class="btn small" on:click={toggleRelayInfo} disabled={relayInfoLoading}>
           {#if relayInfoLoading}
-            Looking up…
+            查询中…
           {:else if relayInfoShown}
-            Hide my addresses
+            隐藏我的地址
           {:else}
-            Show my addresses to share
+            显示可分享的地址
           {/if}
         </button>
         {#if relayInfoShown && relayInfo}
           <div class="share-banner">
-            <div class="share-title with-icon"><RadioTower size={15} />Share these with your friend</div>
-            <div class="share-row"><span>LAN IPs:</span> {relayInfo.lanIps?.join(', ') || '—'}</div>
-            <div class="share-row"><span>Public IP:</span> {relayInfo.publicIp || 'unavailable'}</div>
-            <div class="share-row"><span>Relay port:</span> {relayInfo.relayPort}</div>
+            <div class="share-title with-icon"><RadioTower size={15} />将这些信息分享给你的朋友</div>
+            <div class="share-row"><span>局域网 IP：</span> {relayInfo.lanIps?.join(', ') || '—'}</div>
+            <div class="share-row"><span>公网 IP：</span> {relayInfo.publicIp || '不可用'}</div>
+            <div class="share-row"><span>中继端口：</span> {relayInfo.relayPort}</div>
           </div>
         {/if}
       {/if}
@@ -529,169 +523,165 @@
 
     <div class="card moved" style="margin-top: 14px;">
       <div>
-        <h3 class="section-title with-icon"><Cloud size={17} />Cloud backup</h3>
+        <h3 class="section-title with-icon"><Cloud size={17} />云备份</h3>
         <p class="hint">
-          Where backups go, whether every snapshot is sent there, and whether newer saves are
-          brought from your other devices are all set on the Cloud Backup page.
+          备份的去向、是否上传每个快照、是否从其他设备拉取较新存档，均在云备份页面设置。
         </p>
       </div>
-      <button class="btn" on:click={() => navigate('cloud')}>Open Cloud Backup</button>
+      <button class="btn" on:click={() => navigate('cloud')}>打开云备份</button>
     </div>
   {:else if tab === 'storage'}
     <div class="card">
-      <h3 class="section-title with-icon"><PieChart size={17} />Space used</h3>
+      <h3 class="section-title with-icon"><PieChart size={17} />已用空间</h3>
       <StorageUsage />
     </div>
 
     <div class="card" style="margin-top: 14px;">
-      <h3 class="section-title with-icon"><FileCheck size={17} />Can they be restored?</h3>
+      <h3 class="section-title with-icon"><FileCheck size={17} />能否恢复？</h3>
       <SnapshotChecks />
     </div>
 
     <div class="card" style="margin-top: 14px;">
-      <h3 class="section-title with-icon"><HardDrive size={17} />Snapshot storage</h3>
+      <h3 class="section-title with-icon"><HardDrive size={17} />快照存储</h3>
       <div class="field">
-        <label for="s-backups">Snapshots folder</label>
+        <label for="s-backups">快照文件夹</label>
         <div class="path-row">
           <input id="s-backups" bind:value={draft.backupsDir} />
-          <button class="btn" on:click={pickBackupsDir}>Browse</button>
+          <button class="btn" on:click={pickBackupsDir}>浏览</button>
         </div>
-        <span class="hint">Where version-history snapshots (ZIP archives) are stored.</span>
+        <span class="hint">版本历史快照（ZIP 压缩包）的存储位置。</span>
       </div>
       <div class="field">
-        <label for="s-sync-backups">Pre-sync safety backups folder</label>
+        <label for="s-sync-backups">同步前安全备份文件夹</label>
         <div class="path-row">
-          <input id="s-sync-backups" bind:value={draft.syncBackupsDir} placeholder="Default: ~/.opensave/backups" />
-          <button class="btn" on:click={pickSyncBackupsDir}>Browse</button>
+          <input id="s-sync-backups" bind:value={draft.syncBackupsDir} placeholder="默认：~/.opensave/backups" />
+          <button class="btn" on:click={pickSyncBackupsDir}>浏览</button>
         </div>
-        <span class="hint">A safety copy of your save is taken here before every incoming sync, so a bad sync is always reversible.</span>
+        <span class="hint">每次接收同步前都会在此保存一份存档的安全副本，因此任何糟糕的同步都可撤销。</span>
       </div>
     </div>
 
     <div class="card" style="margin-top: 14px;">
-      <h3 class="section-title with-icon"><Timer size={17} />Retention</h3>
+      <h3 class="section-title with-icon"><Timer size={17} />保留策略</h3>
       <label class="check">
         <input type="checkbox" bind:checked={draft.autoDeleteBackups} />
-        Auto-delete old automatic snapshots
+        自动删除旧的自动快照
       </label>
       <span class="hint">
-        The snapshots OpenSave takes on its own — before a sync replaces files, when a game saves, at a
-        conflict. Snapshots you took yourself are kept, and so is the newest one on every branch, whatever
-        its age. Runs shortly after start and every few hours.
+        OpenSave 自动创建的快照——在同步替换文件之前、游戏保存时、发生冲突时。你手动创建的快照会保留，
+        每条分支上最新的一个也会保留，无论其时间早晚。在启动后不久以及每隔几小时运行。
       </span>
       {#if draft.autoDeleteBackups}
         <div class="field" style="margin-top: 10px;">
-          <label for="s-days">Delete when older than</label>
+          <label for="s-days">删除早于此时间的快照</label>
           <select id="s-days" bind:value={draft.autoDeleteDays}>
-            <option value={7}>7 days</option>
-            <option value={14}>14 days</option>
-            <option value={30}>30 days</option>
-            <option value={60}>60 days</option>
-            <option value={90}>90 days</option>
-            <option value={180}>180 days</option>
+            <option value={7}>7 天</option>
+            <option value={14}>14 天</option>
+            <option value={30}>30 天</option>
+            <option value={60}>60 天</option>
+            <option value={90}>90 天</option>
+            <option value={180}>180 天</option>
           </select>
         </div>
       {/if}
     </div>
 
     <div class="card" style="margin-top: 14px;">
-      <h3 class="section-title with-icon"><History size={17} />Snapshot history</h3>
+      <h3 class="section-title with-icon"><History size={17} />快照历史</h3>
       <div class="field">
-        <label for="s-max-snaps">Automatic snapshots to keep per game</label>
+        <label for="s-max-snaps">每个游戏保留的自动快照数</label>
         <input id="s-max-snaps" type="number" min="0" style="max-width: 120px;" bind:value={draft.defaultMaxSnapshots} />
         <span class="hint">
-          Default limit for newly tracked games (0 = keep everything). The oldest are pruned first,
-          per branch. Change a single game's limit in its Configuration tab.
+          新跟踪游戏的默认上限（0 = 全部保留）。按分支从最旧的开始清理。单个游戏的上限可在其配置页修改。
         </span>
       </div>
       <div class="field">
-        <label for="s-max-manual-snaps">Manual snapshots to keep per game</label>
+        <label for="s-max-manual-snaps">每个游戏保留的手动快照数</label>
         <input id="s-max-manual-snaps" type="number" min="0" style="max-width: 120px;" bind:value={draft.defaultMaxManualSnapshots} />
         <span class="hint">
-          Snapshots you take yourself have their own budget, so games that auto-save often
-          (Elden Ring, Dragonsword) can't push them out. <strong>0 = keep forever</strong>, which is
-          the default.
+          手动创建的快照有独立限额，因此频繁自动存档的游戏（如 Elden Ring、Dragonsword）不会把它们挤掉。
+          <strong>0 = 永久保留</strong>，这也是默认值。
         </span>
       </div>
       <div class="field" style="margin-bottom: 0;">
         <div>
           <button class="btn small" disabled={pruning} on:click={cleanUpSnapshots}>
-            <BrushCleaning size={14} />{pruning ? 'Applying…' : 'Apply these limits to every game'}
+            <BrushCleaning size={14} />{pruning ? '应用中…' : '将这些限额应用到所有游戏'}
           </button>
         </div>
         <span class="hint">
-          Replaces each game's own limits with these, then deletes the snapshots beyond them on
-          every branch. To clean up with each game's own limits, use Space used above.
+          用这些限额替换每个游戏各自的上限，然后删除每条分支中超出的快照。要按各游戏自己的限额清理，
+          请使用上方的已用空间。
         </span>
       </div>
     </div>
 
     <div class="card" style="margin-top: 14px;">
-      <h3 class="section-title with-icon"><ScanSearch size={17} />Game scanner</h3>
+      <h3 class="section-title with-icon"><ScanSearch size={17} />游戏扫描器</h3>
       <div class="field" style="margin-bottom: 0;">
-        <label for="s-scan-paths">Extra folders to scan</label>
-        <span class="hint">Scanning already checks Steam and common emulators — add custom libraries here.</span>
+        <label for="s-scan-paths">额外扫描的文件夹</label>
+        <span class="hint">扫描已覆盖 Steam 和常见模拟器——可在此添加自定义游戏库。</span>
         {#each draft.customScanPaths ?? [] as p, i}
           <div class="rule-row">
             <span class="rule-path" title={p}>{p}</span>
-            <button class="btn small ghost icon" title="Remove" aria-label="Remove" on:click={() => removeScanPath(i)}><X size={15} /></button>
+            <button class="btn small ghost icon" title="移除" aria-label="移除" on:click={() => removeScanPath(i)}><X size={15} /></button>
           </div>
         {/each}
-        <button id="s-scan-paths" class="btn small" on:click={addScanPath}><Plus size={14} />Add folder</button>
+        <button id="s-scan-paths" class="btn small" on:click={addScanPath}><Plus size={14} />添加文件夹</button>
       </div>
 
       <div class="field" style="margin: 18px 0 0;">
-        <label for="s-exclude-paths">Folders to exclude</label>
-        <span class="hint">Scans skip these folders and everything inside them — handy for stale save locations (like an old GSE saves directory) you don't want offered again.</span>
+        <label for="s-exclude-paths">排除的文件夹</label>
+        <span class="hint">扫描会跳过这些文件夹及其中的所有内容——适合不再想被提示的过时存档位置（比如旧的 GSE 存档目录）。</span>
         {#each draft.excludePaths ?? [] as p, i}
           <div class="rule-row">
             <span class="rule-path" title={p}>{p}</span>
-            <button class="btn small ghost icon" title="Remove" aria-label="Remove" on:click={() => removeExcludePath(i)}><X size={15} /></button>
+            <button class="btn small ghost icon" title="移除" aria-label="移除" on:click={() => removeExcludePath(i)}><X size={15} /></button>
           </div>
         {/each}
-        <button id="s-exclude-paths" class="btn small" on:click={addExcludePath}><Plus size={14} />Exclude folder</button>
+        <button id="s-exclude-paths" class="btn small" on:click={addExcludePath}><Plus size={14} />排除文件夹</button>
       </div>
     </div>
 
     <div class="card" style="margin-top: 14px;">
-      <h3 class="section-title with-icon"><RotateCcw size={17} />Reset tracking</h3>
+      <h3 class="section-title with-icon"><RotateCcw size={17} />重置跟踪</h3>
       <div class="field" style="margin-bottom: 0;">
-        <span class="hint">Untrack every game at once, then scan again to add them back from the correct locations — useful after moving games between launchers or drives. This only clears the tracking list; your save snapshots on disk are kept.</span>
+        <span class="hint">一次性取消跟踪所有游戏，然后重新扫描以从正确位置重新添加——在启动器或硬盘之间移动过游戏时很有用。这只清除跟踪列表；磁盘上的存档快照会保留。</span>
         <button
           class="btn small danger"
           style="margin-top: 12px; width: fit-content; align-self: flex-start;"
           on:click={resetTracking}
           disabled={resetting || $gameList.length === 0}
         >
-          {#if resetting}Untracking…{:else if $gameList.length === 0}No games tracked{:else}Untrack all {$gameList.length} game{$gameList.length === 1 ? '' : 's'}{/if}
+          {#if resetting}正在取消跟踪…{:else if $gameList.length === 0}暂无已跟踪游戏{:else}取消跟踪全部 {$gameList.length} 个游戏{/if}
         </button>
       </div>
     </div>
   {:else if tab === 'advanced'}
     <div class="card">
-      <h3 class="section-title with-icon"><Network size={17} />Network</h3>
+      <h3 class="section-title with-icon"><Network size={17} />网络</h3>
       <div class="field" style="margin-bottom: 0;">
-        <label for="s-port">Daemon port</label>
+        <label for="s-port">守护进程端口</label>
         <input id="s-port" type="number" class:invalid={unsaved.includes('port')} bind:value={draft.port} />
-        <span class="hint">The port this device listens on, for the app and for your other devices on the network. Changing it requires a restart.</span>
+        <span class="hint">本设备监听的端口，供本应用和网络上的其他设备使用。更改后需要重启。</span>
       </div>
     </div>
 
     <div class="card" style="margin-top: 14px;">
-      <h3 class="section-title with-icon"><ArrowLeftRight size={17} />Cross-platform path translation</h3>
+      <h3 class="section-title with-icon"><ArrowLeftRight size={17} />跨平台路径转换</h3>
       <div class="field" style="margin-bottom: 0;">
         <span class="hint">
-          Rewrites another device's save paths to this one's conventions, e.g. "C:\Users\me\Saves" → "/home/deck/saves".
+          将其他设备的存档路径改写为本机的路径约定，例如 "C:\Users\me\Saves" → "/home/deck/saves"。
         </span>
         {#each draft.pathTranslations ?? [] as rule, i}
           <div class="rule-row">
-            <input placeholder="From pattern" bind:value={rule.fromPattern} />
+            <input placeholder="源路径模式" bind:value={rule.fromPattern} />
             <span class="arrow"><ArrowRight size={15} /></span>
-            <input placeholder="To pattern" bind:value={rule.toPattern} />
-            <button class="btn small ghost icon" title="Remove" aria-label="Remove" on:click={() => removeRule(i)}><X size={15} /></button>
+            <input placeholder="目标路径模式" bind:value={rule.toPattern} />
+            <button class="btn small ghost icon" title="移除" aria-label="移除" on:click={() => removeRule(i)}><X size={15} /></button>
           </div>
         {/each}
-        <button id="s-rules" class="btn small" on:click={addRule}><Plus size={14} />Add rule</button>
+        <button id="s-rules" class="btn small" on:click={addRule}><Plus size={14} />添加规则</button>
       </div>
     </div>
   {:else if tab === 'support'}
@@ -699,10 +689,9 @@
       <div class="support-hero">
         <div class="support-badge"><Heart size={22} /></div>
         <div class="support-hero-text">
-          <h3 class="support-title">Support OpenSave</h3>
+          <h3 class="support-title">支持 OpenSave</h3>
           <p class="support-lede">
-            Free and open source, and it stays that way — no accounts, no ads, no telemetry,
-            and nothing locked behind a payment.
+            自由开源，且将一直如此——无需账号、没有广告、没有遥测，也没有任何内容需要付费解锁。
           </p>
         </div>
       </div>
@@ -710,25 +699,24 @@
       <div class="support-split">
         <div class="support-left">
           <p class="support-body">
-            It's built and maintained in spare time. If it's saved you the hassle of copying
-            save folders between machines, you're welcome to chip in.
+            它由业余时间开发和维护。如果它帮你省去了在电脑之间复制存档文件夹的麻烦，欢迎贡献一份力量。
           </p>
           <ul class="support-points">
-            <li><span class="pt-icon"><Globe size={15} /></span> Keeps the public relay online</li>
-            <li><span class="pt-icon"><Gamepad2 size={15} /></span> More games and emulators detected</li>
-            <li><span class="pt-icon"><Wrench size={15} /></span> Time for fixes and new features</li>
+            <li><span class="pt-icon"><Globe size={15} /></span> 维持公共中继在线</li>
+            <li><span class="pt-icon"><Gamepad2 size={15} /></span> 支持识别更多游戏和模拟器</li>
+            <li><span class="pt-icon"><Wrench size={15} /></span> 投入更多时间修复问题和开发新功能</li>
           </ul>
 
           <div class="support-actions">
             <button class="btn primary support-cta" on:click={openDonatePage}>
-              {donateOpened ? 'Open again' : 'Open donation page'}<ArrowUpRight size={15} />
+              {donateOpened ? '再次打开' : '打开捐赠页面'}<ArrowUpRight size={15} />
             </button>
             {#if donateOpened}
-              <span class="support-opened">Opened in your browser — thank you.</span>
+              <span class="support-opened">已在浏览器中打开——谢谢。</span>
             {/if}
           </div>
           <p class="support-foot">
-            Prefer not to donate? Reporting a bug or suggesting a feature helps just as much.
+            不想捐赠？报告问题或提出建议同样是有力的帮助。
           </p>
         </div>
 
@@ -737,12 +725,12 @@
                image service. Kept on a light plate because phone cameras
                struggle with inverted (light-on-dark) QR codes. -->
           <div class="qr-plate">{@html qrSvg}</div>
-          <span class="qr-caption">Scan to pay<br />from your phone</span>
+          <span class="qr-caption">用手机<br />扫码支付</span>
         </div>
       </div>
 
       <p class="support-note">
-        Payment is handled entirely by Gumroad — OpenSave never sees your card details.
+        支付完全由 Gumroad 处理——OpenSave 不会看到你的银行卡信息。
       </p>
     </div>
   {/if}

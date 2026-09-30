@@ -19,7 +19,7 @@
       <span class="message">{t.message}</span>
       {#if t.action}
         <button class="btn small" on:click={() => act(t)}>{t.action.label}</button>
-        <button class="btn small ghost icon" aria-label="Dismiss" title="Dismiss" on:click={() => dismissToast(t.id)}><X size={14} /></button>
+        <button class="btn small ghost icon" aria-label="关闭" title="关闭" on:click={() => dismissToast(t.id)}><X size={14} /></button>
       {/if}
     </div>
   {/each}

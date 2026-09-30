@@ -130,9 +130,9 @@ describe('contentsLabel', () => {
   const now = Date.now();
 
   it('separates "empty" from "could not look"', () => {
-    expect(contentsLabel({ measured: true, fileCount: 0 }, now)).toMatch(/empty/);
-    expect(contentsLabel({ measured: false, fileCount: 0 }, now)).toBe('size unknown');
-    expect(contentsLabel({ measured: false, fileCount: 0 }, now)).not.toMatch(/empty/);
+    expect(contentsLabel({ measured: true, fileCount: 0 }, now)).toMatch(/为空/);
+    expect(contentsLabel({ measured: false, fileCount: 0 }, now)).toBe('大小未知');
+    expect(contentsLabel({ measured: false, fileCount: 0 }, now)).not.toMatch(/为空/);
   });
 
   // The bug: this read "20000 files+", as though it were twenty thousand
@@ -142,17 +142,16 @@ describe('contentsLabel', () => {
       { measured: true, fileCount: 20000, totalBytes: 1024, latestMtime: now / 1000, truncated: true },
       now
     );
-    expect(label).toContain('20000+ files');
-    expect(label).not.toContain('files+');
+    expect(label).toContain('20000+ 个文件');
+    expect(label).not.toContain('个文件+');
   });
 
-  it('says "1 file", not "1 files"', () => {
+  it('counts the file', () => {
     const label = contentsLabel(
       { measured: true, fileCount: 1, totalBytes: 10, latestMtime: now / 1000 },
       now
     );
-    expect(label).toContain('1 file ');
-    expect(label).not.toContain('1 files');
+    expect(label).toContain('1 个文件 · ');
   });
 });
 
@@ -161,13 +160,13 @@ describe('fmtAge', () => {
   const ago = (secs) => now / 1000 - secs;
 
   it('reads as an age, not a date', () => {
-    expect(fmtAge(0, now)).toBe('never');
-    expect(fmtAge(ago(30), now)).toBe('just now');
-    expect(fmtAge(ago(20 * 60), now)).toBe('20m ago');
-    expect(fmtAge(ago(5 * 3600), now)).toBe('5h ago');
-    expect(fmtAge(ago(22 * 86400), now)).toBe('22d ago');
-    expect(fmtAge(ago(400 * 86400), now)).toBe('over a year ago');
-    expect(fmtAge(ago(3 * 365 * 86400), now)).toBe('3 years ago');
+    expect(fmtAge(0, now)).toBe('从未');
+    expect(fmtAge(ago(30), now)).toBe('刚刚');
+    expect(fmtAge(ago(20 * 60), now)).toBe('20 分钟前');
+    expect(fmtAge(ago(5 * 3600), now)).toBe('5 小时前');
+    expect(fmtAge(ago(22 * 86400), now)).toBe('22 天前');
+    expect(fmtAge(ago(400 * 86400), now)).toBe('一年多前');
+    expect(fmtAge(ago(3 * 365 * 86400), now)).toBe('3 年前');
   });
 });
 

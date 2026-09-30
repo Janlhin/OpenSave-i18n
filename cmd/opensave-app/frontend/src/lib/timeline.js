@@ -2,17 +2,17 @@
 // what happened to every game's save — syncs with other devices, snapshots,
 // play sessions, restores — said as a person would say it.
 import { snapshotKind, whenLabel } from './snapshots.js';
-import { fmtSize, playLength, plural } from './format.js';
+import { fmtSize, playLength } from './format.js';
 
 /** The filters over the timeline, and the kinds each shows. */
 // A conflict and an emptied save are things that happened to a sync, so they
 // are among the syncs; a filter of their own was nearly always empty, and
 // what is waiting on you now is the bell's to say.
 export const TIMELINE_FILTERS = {
-  all: { label: 'Everything', kinds: null },
-  syncs: { label: 'Syncs', kinds: ['received', 'sent', 'deleted', 'cloud-pulled', 'conflict', 'emptied'] },
-  snapshots: { label: 'Snapshots', kinds: ['snapshot', 'restored'] },
-  play: { label: 'Play', kinds: ['played'] }
+  all: { label: '全部', kinds: null },
+  syncs: { label: '同步', kinds: ['received', 'sent', 'deleted', 'cloud-pulled', 'conflict', 'emptied'] },
+  snapshots: { label: '快照', kinds: ['snapshot', 'restored'] },
+  play: { label: '游玩', kinds: ['played'] }
 };
 
 export function filterItems(items, filter = 'all', gameId = '') {
@@ -25,31 +25,31 @@ export function filterItems(items, filter = 'all', gameId = '') {
  * @returns {{icon: string, title: string, detail: string, tone: 'ok'|'warn'|'muted'}}
  */
 export function describe(item, now = new Date()) {
-  const files = item.files ? plural(item.files, 'file') : 'files';
+  const files = item.files ? `${item.files} 个文件` : '文件';
   const where = item.detail && item.kind !== 'restored' ? ` ${item.detail}` : '';
   switch (item.kind) {
     case 'received':
-      return { icon: 'down', title: `Got ${files} from ${item.device}${where}`, detail: item.bytes ? fmtSize(item.bytes) : '', tone: 'ok' };
+      return { icon: 'down', title: `从 ${item.device} 收到 ${files}${where}`, detail: item.bytes ? fmtSize(item.bytes) : '', tone: 'ok' };
     case 'sent':
-      return { icon: 'up', title: `${item.device} took ${files} from here`, detail: '', tone: 'ok' };
+      return { icon: 'up', title: `${item.device} 从这里取走了 ${files}`, detail: '', tone: 'ok' };
     case 'deleted':
-      return { icon: 'trash', title: `Deleted ${files} as ${item.device} did${where}`, detail: '', tone: 'muted' };
+      return { icon: 'trash', title: `随 ${item.device} 一道删除了 ${files}${where}`, detail: '', tone: 'muted' };
     case 'restored': {
       const [, at] = (item.detail ?? '').split('|');
-      return { icon: 'restore', title: at ? `Put back the snapshot of ${whenLabel(at, now)}` : 'Put back a snapshot', detail: '', tone: 'ok' };
+      return { icon: 'restore', title: at ? `放回了 ${whenLabel(at, now)} 的快照` : '放回了一个快照', detail: '', tone: 'ok' };
     }
     case 'cloud-pulled':
-      return { icon: 'cloud', title: `Brought ${item.device}'s newer save from the cloud`, detail: '', tone: 'ok' };
+      return { icon: 'cloud', title: `从云端取来了 ${item.device} 的较新存档`, detail: '', tone: 'ok' };
     case 'emptied':
-      return { icon: 'alert', title: 'Every save file was deleted here', detail: item.files ? `${files} kept on your other devices until you chose` : '', tone: 'warn' };
+      return { icon: 'alert', title: '所有存档文件已在此删除', detail: item.files ? `${files} 保留在你的其他设备上，直到你做出选择` : '', tone: 'warn' };
     case 'conflict':
-      return { icon: 'alert', title: `Changed here and on ${item.device} at once`, detail: 'Needed a decision', tone: 'warn' };
+      return { icon: 'alert', title: `此处与 ${item.device} 同时发生了更改`, detail: '需要做出决定', tone: 'warn' };
     case 'played':
-      return { icon: 'play', title: item.durationMs ? `Played for ${playLength(item.durationMs)}` : 'Played', detail: 'On this device', tone: 'ok' };
+      return { icon: 'play', title: item.durationMs ? `游玩了 ${playLength(item.durationMs)}` : '开始游玩', detail: '在此设备上', tone: 'ok' };
     case 'snapshot': {
-      if (item.device) return { icon: 'camera', title: `Kept a copy of ${item.device}'s save`, detail: '', tone: 'muted' };
+      if (item.device) return { icon: 'camera', title: `保留了 ${item.device} 存档的副本`, detail: '', tone: 'muted' };
       const why = snapshotKind({ comment: item.comment, isSystemAuto: item.auto }, now);
-      return { icon: 'camera', title: why.kind === 'manual' ? `Snapshot: ${why.title}` : why.title, detail: why.kind === 'manual' ? 'Taken by you' : '', tone: 'muted' };
+      return { icon: 'camera', title: why.kind === 'manual' ? `快照：${why.title}` : why.title, detail: why.kind === 'manual' ? '由你手动创建' : '', tone: 'muted' };
     }
     default:
       return { icon: 'dot', title: item.kind, detail: '', tone: 'muted' };
@@ -94,13 +94,13 @@ export function byDay(list, now = new Date()) {
 function dayName(d, now) {
   const start = (x) => new Date(x.getFullYear(), x.getMonth(), x.getDate()).getTime();
   const diff = Math.round((start(now) - start(d)) / 86_400_000);
-  if (diff === 0) return 'Today';
-  if (diff === 1) return 'Yesterday';
+  if (diff === 0) return '今天';
+  if (diff === 1) return '昨天';
   return d.toLocaleDateString(undefined, { weekday: 'long', day: 'numeric', month: 'long', ...(d.getFullYear() === now.getFullYear() ? {} : { year: 'numeric' }) });
 }
 
 /** Where a game was last played, in words: this device, or another. */
 export function playedWhere(g, thisDevice) {
   if (!g?.lastPlayedAt) return '';
-  return g.lastPlayedOn ? g.lastPlayedOn : thisDevice ? `${thisDevice} (here)` : 'Here';
+  return g.lastPlayedOn ? g.lastPlayedOn : thisDevice ? `${thisDevice}（本机）` : '本机';
 }

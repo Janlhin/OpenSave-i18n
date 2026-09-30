@@ -76,19 +76,19 @@
     // "removed from your library" for the second would be a lie about a
     // destructive step that isn't happening.
     const message = remote
-      ? `Link "${remote.name}" on ${remote.peerName} to "${game.name}"? The two will be treated as the same game when these devices sync. Nothing on either device is removed.`
-      : `Link "${other?.name ?? linkTarget}" into "${game.name}"? They'll be treated as the same game when syncing across devices. "${other?.name ?? linkTarget}" leaves your library here — its save files stay where they are, and its snapshots move to "${game.name}", on a branch of their own.`;
+      ? `将 ${remote.peerName} 上的“${remote.name}”关联到“${game.name}”？这些设备同步时，两者会被视为同一游戏。任何一台设备都不会删除内容。`
+      : `将“${other?.name ?? linkTarget}”关联到“${game.name}”？跨设备同步时，它们会被视为同一游戏。“${other?.name ?? linkTarget}”会从此处库中移除 — 其存档文件留在原处，快照则会移到“${game.name}”名下、归入以它命名的独立分支。`;
 
-    const ok = await askConfirm(message, { title: 'Link games?', confirmText: 'Link' });
+    const ok = await askConfirm(message, { title: '关联游戏？', confirmText: '关联' });
     if (!ok) return;
     const canonicalId = game.id;
-    await run('Games linked', () => api.post(`/api/games/${canonicalId}/link`, { alias: linkTarget }));
+    await run('游戏已关联', () => api.post(`/api/games/${canonicalId}/link`, { alias: linkTarget }));
     linkTarget = '';
     await loadAliases();
   }
 
   async function unlink(aliasId) {
-    await run('Link removed', () => api.del(`/api/games/${game.id}/alias/${aliasId}`));
+    await run('已解除关联', () => api.del(`/api/games/${game.id}/alias/${aliasId}`));
     await loadAliases();
   }
 
@@ -97,12 +97,11 @@
 </script>
 
 <div class="card">
-  <h3>Linked copies</h3>
+  <h3>已关联的副本</h3>
   <p class="desc">
-    If this game is tracked under a different name or drive on another PC (e.g. a Steam copy vs. a
-    portable copy), link the copies so their saves sync across devices. Linking merges another tracked
-    game here into this one: its save files stay where they are, and its snapshots move here, onto a
-    branch named after it.
+    如果这个游戏在另一台电脑上以不同名称或盘符被跟踪（例如 Steam 版与便携版），可以关联这些副本，
+    让它们的存档跨设备同步。关联会把另一个被跟踪的游戏合并到此条目：其存档文件留在原处，
+    快照则移到这里，归入以它命名的分支。
   </p>
   {#if aliases.length > 0}
     <div class="alias-list">
@@ -111,7 +110,7 @@
           <span class="alias-id" title={a.savePath || a.id}>
             <Link size={13} class="inline-icon" />{a.name || a.id}{a.savePath ? ` — ${a.savePath}` : ''}
           </span>
-          <button class="btn small" disabled={$busy} on:click={() => unlink(a.id)}>Unlink</button>
+          <button class="btn small" disabled={$busy} on:click={() => unlink(a.id)}>解除关联</button>
         </div>
       {/each}
     </div>
@@ -123,29 +122,28 @@
     <LinkPicker localGames={otherGames} {peerGames} bind:selected={linkTarget} />
     <div class="link-row">
       <button class="btn small primary" disabled={$busy || !linkTarget} on:click={linkGame}>
-        <Link size={13} />{linkTarget ? `Link ${chosenName}` : 'Choose a game above to link'}
+        <Link size={13} />{linkTarget ? `关联 ${chosenName}` : '在上方选择要关联的游戏'}
       </button>
     </div>
     {#if peerGamesLoading}
-      <p class="desc">Checking paired devices…</p>
+      <p class="desc">正在检查配对设备…</p>
     {/if}
   {:else if peerGamesLoading}
-    <p class="desc">Checking paired devices…</p>
+    <p class="desc">正在检查配对设备…</p>
   {:else}
     <p class="desc">
-      Nothing to link to. Track the other copy on this device, or pair the device that
-      has it and make sure it's online — its games appear here once it answers.
+      没有可关联的对象。可以在这台设备上跟踪另一个副本，或者配对拥有它的设备并确保其在线 —
+      设备应答后，它的游戏就会出现在这里。
     </p>
   {/if}
 </div>
 
 <div class="card" style="margin-top: 16px;">
-  <h3>Stop tracking</h3>
+  <h3>停止跟踪</h3>
   <p class="desc">
-    Removes "{game.name}" from OpenSave. Your save files and existing snapshot archives on disk are
-    kept.
+    将“{game.name}”从 OpenSave 中移除。磁盘上的存档文件和已有的快照归档都会保留。
   </p>
-  <button class="btn danger" disabled={$busy} on:click={untrack}>Stop tracking this game</button>
+  <button class="btn danger" disabled={$busy} on:click={untrack}>停止跟踪此游戏</button>
 </div>
 
 <style>

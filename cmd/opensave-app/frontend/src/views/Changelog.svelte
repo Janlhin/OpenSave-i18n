@@ -24,12 +24,12 @@
 <div class="page">
   <header class="head">
     <div>
-      <h1>Changelog</h1>
-      <p class="sub">Everything that's changed, newest first.</p>
+      <h1>更新日志</h1>
+      <p class="sub">全部变更，最新在前。</p>
     </div>
     {#if current}
-      <div class="running" title="The version you're running">
-        <span>Running</span>
+      <div class="running" title="你正在运行的版本">
+        <span>当前版本</span>
         {current}
       </div>
     {/if}

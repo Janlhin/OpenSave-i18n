@@ -23,8 +23,8 @@
     google_drive: 'Google Drive',
     onedrive: 'OneDrive',
     dropbox: 'Dropbox',
-    webdav: 'your WebDAV server',
-    local: 'your backup folder'
+    webdav: '你的 WebDAV 服务器',
+    local: '你的备份文件夹'
   };
 
   const key = (o) => `${o.gameId}:${o.snapshotId}`;
@@ -34,7 +34,7 @@
     busy = key(offer);
     try {
       await api.post('/api/cloud/offers/accept', { gameId: offer.gameId, snapshotId: offer.snapshotId });
-      toast(`Now using ${offer.deviceName}'s save for “${offer.gameName}” — this device's is kept as a snapshot`, 'success');
+      toast(`“${offer.gameName}”现在使用 ${offer.deviceName} 的存档——本机的存档已保存为快照`, 'success');
     } catch (e) {
       toast(e.message, 'error');
     } finally {
@@ -62,26 +62,25 @@
         <div class="offer-icon"><CloudDownload size={19} /></div>
         <div class="offer-body">
           <div class="offer-title">
-            <strong>{offer.deviceName}</strong> has a newer save for <strong>{offer.gameName}</strong>
+            <strong>{offer.deviceName}</strong> 有 <strong>{offer.gameName}</strong> 的更新存档
           </div>
           <div class="offer-sub">
-            Saved {timeAgo(offer.savedAt)} · in {where[offer.provider] ?? 'your cloud backup'}
+            保存于 {timeAgo(offer.savedAt)} · 位于 {where[offer.provider] ?? '你的云端备份'}
           </div>
           {#if offer.diverged}
             <!-- Not "since the two last matched": two devices meeting through
                  the cloud for the first time never matched at all, and that
                  is the commonest way to see this card. -->
             <div class="offer-warn">
-              This device's save has changes of its own that aren't in {offer.deviceName}'s.
-              Bringing theirs replaces them — this device's save is kept as a snapshot you can go
-              back to.
+              本机的存档有 {offer.deviceName} 那边没有的更改。
+              带来对方的存档会覆盖这些更改——本机存档会保存为快照，可供以后恢复。
             </div>
           {/if}
         </div>
         <div class="offer-actions">
-          <button class="btn small" disabled={!!busy} on:click={() => later(offer)}>Not now</button>
+          <button class="btn small" disabled={!!busy} on:click={() => later(offer)}>暂不</button>
           <button class="btn small primary" disabled={!!busy} on:click={() => bring(offer)}>
-            {busy === key(offer) ? 'Bringing…' : 'Bring it here'}
+            {busy === key(offer) ? '正在获取…' : '带到本机'}
           </button>
         </div>
       </div>
