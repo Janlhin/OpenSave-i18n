@@ -6,10 +6,10 @@ import { toast } from './stores.js';
 /** The lengths offered wherever pausing is, worded to follow "Pause
  *  syncing". null is until resumed. */
 export const PAUSE_CHOICES = [
-  { minutes: 15, label: 'for 15 minutes' },
-  { minutes: 60, label: 'for 1 hour' },
-  { minutes: 180, label: 'for 3 hours' },
-  { minutes: null, label: 'until I resume' }
+  { minutes: 15, label: '15 分钟' },
+  { minutes: 60, label: '1 小时' },
+  { minutes: 180, label: '3 小时' },
+  { minutes: null, label: '直到我手动恢复' }
 ];
 
 /** "for 42 more minutes", "for 1 h 05 min", "until you resume". */

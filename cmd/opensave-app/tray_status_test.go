@@ -15,18 +15,18 @@ func TestTrayStatusSaysTheMostImportantThing(t *testing.T) {
 		facts trayFacts
 		want  string
 	}{
-		{trayFacts{Games: 6, Conflicts: 1, Pause: paused, Syncing: []string{"Hades"}}, "1 game needs a decision"},
-		{trayFacts{Games: 6, Conflicts: 3}, "3 games need a decision"},
-		{trayFacts{Games: 6, Pause: paused, Syncing: []string{"Hades"}}, "Syncing paused · 42m left"},
-		{trayFacts{Games: 6, Pause: syncpause.Status{Paused: true, UntilRestart: true}}, "Syncing paused until you resume"},
-		{trayFacts{Games: 6, Pause: syncpause.Status{Paused: true, RemainingSeconds: 3600}}, "Syncing paused · 1h left"},
-		{trayFacts{Games: 6, Pause: syncpause.Status{Paused: true, RemainingSeconds: 5400}}, "Syncing paused · 1h 30m left"},
-		{trayFacts{Games: 6, Pause: syncpause.Status{Paused: true, RemainingSeconds: 20}}, "Syncing paused · under a minute left"},
-		{trayFacts{Games: 6, Syncing: []string{"Hades"}}, "Syncing Hades…"},
-		{trayFacts{Games: 6, Syncing: []string{"Hades", "Celeste"}}, "Syncing 2 games…"},
-		{trayFacts{Games: 0}, "No games tracked yet"},
-		{trayFacts{Games: 1}, "Watching 1 game"},
-		{trayFacts{Games: 6}, "Watching 6 games"},
+		{trayFacts{Games: 6, Conflicts: 1, Pause: paused, Syncing: []string{"Hades"}}, "1 个游戏需要你处理"},
+		{trayFacts{Games: 6, Conflicts: 3}, "3 个游戏需要你处理"},
+		{trayFacts{Games: 6, Pause: paused, Syncing: []string{"Hades"}}, "同步已暂停 · 剩余 42 分钟"},
+		{trayFacts{Games: 6, Pause: syncpause.Status{Paused: true, UntilRestart: true}}, "同步已暂停，直到你恢复"},
+		{trayFacts{Games: 6, Pause: syncpause.Status{Paused: true, RemainingSeconds: 3600}}, "同步已暂停 · 剩余 1 小时"},
+		{trayFacts{Games: 6, Pause: syncpause.Status{Paused: true, RemainingSeconds: 5400}}, "同步已暂停 · 剩余 1 小时 30 分"},
+		{trayFacts{Games: 6, Pause: syncpause.Status{Paused: true, RemainingSeconds: 20}}, "同步已暂停 · 剩余不到 1 分钟"},
+		{trayFacts{Games: 6, Syncing: []string{"Hades"}}, "正在同步 Hades…"},
+		{trayFacts{Games: 6, Syncing: []string{"Hades", "Celeste"}}, "正在同步 2 个游戏…"},
+		{trayFacts{Games: 0}, "还没有跟踪任何游戏"},
+		{trayFacts{Games: 1}, "正在监视 1 个游戏"},
+		{trayFacts{Games: 6}, "正在监视 6 个游戏"},
 	} {
 		if got := trayStatus(c.facts); got != c.want {
 			t.Errorf("%+v: %q, want %q", c.facts, got, c.want)

@@ -12,13 +12,13 @@
   <div class="right">
   <NotificationHub />
   <div class="controls" style="--wails-draggable: no-drag">
-    <button on:click={() => native.minimise()} title="Minimise" aria-label="Minimise">
+    <button on:click={() => native.minimise()} title="最小化" aria-label="最小化">
       <svg width="10" height="10" viewBox="0 0 10 10"><line x1="1" y1="5.5" x2="9" y2="5.5" stroke="currentColor" stroke-width="1.2"/></svg>
     </button>
-    <button on:click={() => native.toggleMaximise()} title="Maximise" aria-label="Maximise">
+    <button on:click={() => native.toggleMaximise()} title="最大化" aria-label="最大化">
       <svg width="10" height="10" viewBox="0 0 10 10"><rect x="1.5" y="1.5" width="7" height="7" fill="none" stroke="currentColor" stroke-width="1.2"/></svg>
     </button>
-    <button class="close" on:click={() => native.close()} title="Close" aria-label="Close">
+    <button class="close" on:click={() => native.close()} title="关闭" aria-label="关闭">
       <svg width="10" height="10" viewBox="0 0 10 10"><path d="M1.5 1.5 L8.5 8.5 M8.5 1.5 L1.5 8.5" stroke="currentColor" stroke-width="1.2"/></svg>
     </button>
   </div>

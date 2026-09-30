@@ -34,7 +34,7 @@
   const pauseMenu = (e) =>
     openMenu(
       e,
-      PAUSE_CHOICES.map((c) => ({ label: `Pause syncing ${c.label}`, icon: Pause, run: () => pauseSync(c.minutes) }))
+      PAUSE_CHOICES.map((c) => ({ label: `暂停同步 ${c.label}`, icon: Pause, run: () => pauseSync(c.minutes) }))
     );
 
   $: running = Object.entries($syncActivity).filter(([, s]) => s.state === 'running');
@@ -45,8 +45,8 @@
   $: lost = connectedOnce && !$wsConnected;
   $: onlinePeers = Object.values($peers).filter((p) => p.status === 'online').length;
   $: statusText = running.length
-    ? `Syncing ${running.length} game${running.length > 1 ? 's' : ''}…`
-    : 'No syncs in progress';
+    ? `正在同步 ${running.length} 个游戏…`
+    : '没有正在进行的同步';
 </script>
 
 {#if $showAbout}
@@ -62,38 +62,38 @@
 <footer>
   <div class="left">
     {#if lost}
-      <span class="offline" title="The app has lost touch with its background service and is reconnecting">Reconnecting…</span>
+      <span class="offline" title="应用与后台服务失去连接，正在重连">正在重连…</span>
     {:else if $syncPause.paused}
-      <span class="paused" title="Syncing is paused {pauseLength($syncPause, now)}. Snapshots are still taken.">
-        Syncing paused · {pauseShort($syncPause, now)}
+      <span class="paused" title="同步已暂停 {pauseLength($syncPause, now)}。快照仍会照常生成。">
+        同步已暂停 · {pauseShort($syncPause, now)}
       </span>
-      <button class="bar-btn" on:click={resumeSync} title="Resume syncing and catch up"><Play size={11} />Resume</button>
+      <button class="bar-btn" on:click={resumeSync} title="恢复同步并补齐进度"><Play size={11} />恢复</button>
     {:else}
       <span>{statusText}</span>
       {#if running.length && running[0][1].percentage != null}
         <span class="pct">{running[0][1].percentage}%</span>
       {/if}
-      <button class="bar-btn icon" on:click={pauseMenu} title="Pause syncing" aria-label="Pause syncing"><Pause size={11} /></button>
+      <button class="bar-btn icon" on:click={pauseMenu} title="暂停同步" aria-label="暂停同步"><Pause size={11} /></button>
     {/if}
   </div>
   <div class="right">
     {#if $wanRoom?.connected}
-      <span class="wan">relay: {$wanRoom.roomCode}</span>
+      <span class="wan">中继: {$wanRoom.roomCode}</span>
     {/if}
-    <span>{onlinePeers} {onlinePeers === 1 ? 'device' : 'devices'} online</span>
+    <span>{onlinePeers} 台设备在线</span>
     <button
       class="bar-btn"
       class:on={transfersOpen}
       on:click={() => (transfersOpen = !transfersOpen)}
-      title="What is moving between your devices"
+      title="查看设备间正在传输的内容"
       aria-expanded={transfersOpen}
     >
-      <ArrowDownUp size={11} />Transfers{#if running.length}<span class="count">{running.length}</span>{/if}
+      <ArrowDownUp size={11} />传输{#if running.length}<span class="count">{running.length}</span>{/if}
     </button>
-    <button class="kbd-hint" on:click={() => paletteOpen.set(true)} title="Jump to a game, a page or an action">
+    <button class="kbd-hint" on:click={() => paletteOpen.set(true)} title="跳转到游戏、页面或操作">
       <kbd>{modKey} K</kbd>
     </button>
-    <button class="ver" on:click={() => showAbout.set(true)} title="About OpenSave">OpenSave v{version}</button>
+    <button class="ver" on:click={() => showAbout.set(true)} title="关于 OpenSave">OpenSave v{version}</button>
   </div>
 </footer>
 

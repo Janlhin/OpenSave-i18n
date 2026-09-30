@@ -37,12 +37,12 @@
   let filter = '';
 
   const nav = [
-    { id: 'home', label: 'Home', icon: House },
-    { id: 'devices', label: 'Devices', icon: MonitorSmartphone },
-    { id: 'cloud', label: 'Cloud Backup', icon: Cloud },
-    { id: 'activity', label: 'Activity', icon: Activity },
-    { id: 'settings', label: 'Settings', icon: Settings },
-    { id: 'changelog', label: 'Changelog', icon: ScrollText }
+    { id: 'home', label: '主页', icon: House },
+    { id: 'devices', label: '设备', icon: MonitorSmartphone },
+    { id: 'cloud', label: '云备份', icon: Cloud },
+    { id: 'activity', label: '活动记录', icon: Activity },
+    { id: 'settings', label: '设置', icon: Settings },
+    { id: 'changelog', label: '更新日志', icon: ScrollText }
   ];
 
   $: deviceName = $settings?.deviceName ?? '…';
@@ -65,7 +65,7 @@
     <div class="avatar">{initials(deviceName)}</div>
     <div class="who">
       <div class="name">{deviceName}</div>
-      <div class="sub">this device</div>
+      <div class="sub">本机</div>
     </div>
   </div>
 
@@ -82,13 +82,13 @@
   </nav>
 
   <div class="library-head">
-    <span>MY LIBRARY</span>
-    <button class="add" title="Track a game" aria-label="Track a game" on:click={() => navigate('home', { add: true })}><Plus size={15} /></button>
+    <span>我的游戏库</span>
+    <button class="add" title="添加游戏" aria-label="添加游戏" on:click={() => navigate('home', { add: true })}><Plus size={15} /></button>
   </div>
 
   <label class="filter">
     <Search size={14} />
-    <input placeholder="Filter library" aria-label="Filter library" data-find-fallback bind:value={filter} />
+    <input placeholder="筛选游戏库" aria-label="筛选游戏库" data-find-fallback bind:value={filter} />
   </label>
 
   <div class="library">
@@ -122,16 +122,16 @@
         </span>
         <span class="game-name">{game.name}</span>
         {#if game.playingSince}
-          <span class="session" title="In session"><Gamepad2 size={13} /></span>
+          <span class="session" title="游戏进行中"><Gamepad2 size={13} /></span>
         {/if}
         {#if $syncActivity[game.id]?.state === 'running'}
-          <span class="spin" title="Syncing"></span>
+          <span class="spin" title="正在同步"></span>
         {/if}
       </button>
     {:else}
       {#if $stateLoaded}
         <div class="library-empty">
-          {$gameList.length === 0 ? 'No games tracked yet' : 'No matches'}
+          {$gameList.length === 0 ? '还没有跟踪任何游戏' : '没有匹配结果'}
         </div>
       {/if}
     {/each}
@@ -140,7 +140,7 @@
   {#if activeSyncs > 0}
     <div class="sync-note">
       <span class="spin"></span>
-      {activeSyncs} sync{activeSyncs > 1 ? 's' : ''} in progress
+      {activeSyncs} 个同步正在进行
     </div>
   {/if}
 </aside>
