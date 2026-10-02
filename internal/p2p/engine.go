@@ -65,10 +65,22 @@ type Engine struct {
 	OnUntrackRequest func(gameID string)
 	OnRetrackRequest func(gameID string)
 
+	// OnAutoTracked fires when a game has just been tracked here because a
+	// paired device asked for it (ensureManifestGame), so the daemon can give
+	// it what tracking by hand does: a watch, and a first snapshot of what is
+	// already in its folder. Without it the game had neither (GitHub #16).
+	// Wired by the daemon. May be nil.
+	OnAutoTracked func(game store.Game)
+
 	// SwitchSaveFolder picks where a Switch save arriving from a peer belongs
 	// on this device (presets.Scanner.SwitchSaveFolder). Wired by the daemon.
 	// May be nil.
 	SwitchSaveFolder func(titleID, translated string) string
+	// KnownSaveLocation reports whether a folder is one this device's own
+	// scanner recognises as a save folder: the only kind a game arriving
+	// from a peer may be tracked at without the user's say-so (see
+	// ensureManifestGame). Wired by the daemon; nil knows of nothing.
+	KnownSaveLocation func(path string) bool
 
 	// Failsafe: games whose last sync was interrupted (network error mid-
 	// transfer) are queued here and retried automatically, no prompt, until
@@ -92,6 +104,11 @@ type Engine struct {
 	// Goodbyes still owed to devices this one unpaired; see farewell.go.
 	farewellMu sync.Mutex
 	farewells  map[string]*farewell
+
+	// Held while a request decides whether its peer has just come online, so
+	// the several requests a returning device sends at once start one sync of
+	// everything between them, not one each (requirePairedPeer).
+	onlineMu sync.Mutex
 
 	// Live per-peer app build info (version + build time) learned from
 	// pings/hellos, powering the "update from this device" flow.

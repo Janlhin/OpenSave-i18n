@@ -15,6 +15,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/opensave/opensave/internal/fsx"
@@ -153,6 +154,28 @@ func hashBytes(b []byte) string {
 	return hex.EncodeToString(sum[:])
 }
 
+// hashBuffers holds HashFile's read buffers for reuse, one pool per block
+// size. A buffer of a whole block per file, whatever the file's size, made a
+// save of 238,000 small files allocate 15 GB per manifest build (GitHub #15).
+// Nothing keeps a buffer past the call: each chunk is hashed where it lies.
+var hashBuffers = map[int]*sync.Pool{
+	defaultBlockSize: newHashBufferPool(defaultBlockSize),
+	mediumBlockSize:  newHashBufferPool(mediumBlockSize),
+	largeBlockSize:   newHashBufferPool(largeBlockSize),
+}
+
+func newHashBufferPool(size int) *sync.Pool {
+	return &sync.Pool{New: func() any {
+		b := make([]byte, size)
+		return &b
+	}}
+}
+
+// hashBuffer is a read buffer of one block, from its pool.
+func hashBuffer(blockSize int) *[]byte {
+	return hashBuffers[blockSize].Get().(*[]byte)
+}
+
 // HashFile computes the whole-file SHA-256 and per-block SHA-256 list for
 // the file at path, using the block size dictated by its size.
 func HashFile(path string) (FileEntry, error) {
@@ -169,7 +192,9 @@ func HashFile(path string) (FileEntry, error) {
 	defer f.Close()
 
 	whole := sha256.New()
-	buf := make([]byte, blockSize)
+	pooled := hashBuffer(blockSize)
+	defer hashBuffers[blockSize].Put(pooled)
+	buf := *pooled
 	var blocks []Block
 	index := 0
 	for {
@@ -203,7 +228,13 @@ func HashFile(path string) (FileEntry, error) {
 
 // BuildManifest walks root (a directory or a single file, per
 // ResolveLocalSaveFilePath) and returns a full Manifest of its contents.
+// Builds of one folder that overlap are coalesced (manifest_builds.go); the
+// walk itself is buildManifest.
 func BuildManifest(root string) (Manifest, error) {
+	return builds.build(root)
+}
+
+func buildManifest(root string) (Manifest, error) {
 	// Never scan profile/system-level folders. A mis-tracked game pointing
 	// at e.g. C:\Users\<name> would otherwise try to hash (and sync!) the
 	// whole user profile — and die on the first legacy junction anyway.
