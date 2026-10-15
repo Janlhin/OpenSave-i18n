@@ -186,5 +186,32 @@
   "home.welcome.intro": "Keep your game saves in sync across every device — no accounts, no cloud lock-in. Start by finding your saves:",
   "home.welcome.scanForSaves": "Scan for saves",
   "home.welcome.title": "Welcome to OpenSave",
-  "home.welcome.trackManually": "Track a folder manually"
+  "home.welcome.trackManually": "Track a folder manually",
+  "common.close": "Close",
+  "common.dismiss": "Dismiss",
+  "common.loading": "Loading",
+  "titleBar.minimise": "Minimise",
+  "titleBar.maximise": "Maximise",
+  "statusBar.reconnecting": "Reconnecting…",
+  "statusBar.reconnectingTitle": "The app has lost touch with its background service and is reconnecting",
+  "statusBar.noSyncs": "No syncs in progress",
+  "statusBar.syncing": {
+    "one": "Syncing {n} game…",
+    "other": "Syncing {n} games…"
+  },
+  "statusBar.devicesOnline": {
+    "one": "{n} device online",
+    "other": "{n} devices online"
+  },
+  "statusBar.resume": "Resume",
+  "statusBar.resumeTitle": "Resume syncing and catch up",
+  "statusBar.pause": "Pause syncing",
+  "statusBar.transfersHint": "What is moving between your devices",
+  "statusBar.paletteHint": "Jump to a game, a page or an action",
+  "statusBar.aboutTitle": "About OpenSave",
+  "transfers.title": "Transfers",
+  "transfers.empty": "Nothing has moved between your devices since OpenSave started.",
+  "transfers.now": "Now",
+  "transfers.recently": "Recently",
+  "transfers.readError": "Couldn't read transfers: {error}"
 }
