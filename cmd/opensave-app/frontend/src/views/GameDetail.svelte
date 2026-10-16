@@ -2,6 +2,7 @@
   import { slidingIndicator } from '../lib/motion.js';
   import { games } from '../lib/stores.js';
   import { createRunner } from '../lib/runner.js';
+  import { t } from '../lib/i18n.js';
   import GameHeader from './game/GameHeader.svelte';
   import SnapshotsTab from './game/SnapshotsTab.svelte';
   import BranchesTab from './game/BranchesTab.svelte';
@@ -52,7 +53,7 @@
 </script>
 
 {#if !game}
-  <div class="empty"><h3>Game not found</h3></div>
+  <div class="empty"><h3>{$t('game.notFound')}</h3></div>
 {:else}
   {#key params.gameId}
     <GameHeader {game} {runner} />
