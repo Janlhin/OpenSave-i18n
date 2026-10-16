@@ -1150,5 +1150,9 @@
   "restore.unplaced": "它还包含 {names} 的文件——这台设备上没有对应的文件夹，这些文件会被跳过。",
   "restore.safe": "你当前的存档会先保存为一份快照，因此这一操作可以撤销。",
   "restore.anyway": "仍然恢复",
-  "restore.restore": "恢复"
+  "restore.restore": "恢复",
+  "settings.appearance.theme": "主题",
+  "settings.appearance.accent": "强调色",
+  "settings.appearance.size": "大小",
+  "settings.appearance.animations": "动画"
 }

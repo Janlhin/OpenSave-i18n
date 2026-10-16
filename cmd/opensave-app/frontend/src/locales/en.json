@@ -1309,5 +1309,9 @@
   "restore.unplaced": "It also has files for {names}, which has no folder on this device; they are left out.",
   "restore.safe": "Your current save is kept as a snapshot first, so this can be undone.",
   "restore.anyway": "Restore anyway",
-  "restore.restore": "Restore"
+  "restore.restore": "Restore",
+  "settings.appearance.theme": "Theme",
+  "settings.appearance.accent": "Accent colour",
+  "settings.appearance.size": "Size",
+  "settings.appearance.animations": "Animations"
 }

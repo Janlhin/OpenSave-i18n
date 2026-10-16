@@ -1150,5 +1150,9 @@
   "restore.unplaced": "它還包含 {names} 的檔案——這臺裝置上沒有對應的資料夾，這些檔案會被跳過。",
   "restore.safe": "你當前的存檔會先儲存為一份快照，因此這一操作可以撤銷。",
   "restore.anyway": "仍然恢復",
-  "restore.restore": "恢復"
+  "restore.restore": "恢復",
+  "settings.appearance.theme": "主題",
+  "settings.appearance.accent": "強調色",
+  "settings.appearance.size": "大小",
+  "settings.appearance.animations": "動畫"
 }

@@ -25,7 +25,7 @@
   </label>
 
   <div class="group">
-    <span class="label" id="ap-theme">Theme</span>
+    <span class="label" id="ap-theme">{$t('settings.appearance.theme')}</span>
     <div class="segmented" role="radiogroup" aria-labelledby="ap-theme" use:slidingIndicator={{ mode: 'fill' }}>
       {#each Object.entries(THEMES) as [id, label]}
         <button role="radio" aria-checked={$appearance.theme === id} class:on={$appearance.theme === id} on:click={() => set({ theme: id })}>
@@ -36,7 +36,7 @@
   </div>
 
   <div class="group">
-    <span class="label" id="ap-accent">Accent colour</span>
+    <span class="label" id="ap-accent">{$t('settings.appearance.accent')}</span>
     <div class="swatches" role="radiogroup" aria-labelledby="ap-accent">
       {#each Object.entries(ACCENTS) as [id, a]}
         <button
@@ -55,7 +55,7 @@
   </div>
 
   <label class="group">
-    <span class="label">Size</span>
+    <span class="label">{$t('settings.appearance.size')}</span>
     <select value={String($appearance.scale)} on:change={(e) => set({ scale: Number(e.currentTarget.value) })}>
       {#each SCALES as s}
         <option value={String(s)}>{Math.round(s * 100)}%{s === 1 ? ' (default)' : ''}</option>
