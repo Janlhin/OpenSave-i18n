@@ -531,159 +531,153 @@
     </div>
   {:else if tab === 'storage'}
     <div class="card">
-      <h3 class="section-title with-icon"><PieChart size={17} />Space used</h3>
+      <h3 class="section-title with-icon"><PieChart size={17} />{$t('settings.storage.spaceUsed')}</h3>
       <StorageUsage />
     </div>
 
     <div class="card" style="margin-top: 14px;">
-      <h3 class="section-title with-icon"><FileCheck size={17} />Can they be restored?</h3>
+      <h3 class="section-title with-icon"><FileCheck size={17} />{$t('settings.storage.canRestore')}</h3>
       <SnapshotChecks />
     </div>
 
     <div class="card" style="margin-top: 14px;">
-      <h3 class="section-title with-icon"><HardDrive size={17} />Snapshot storage</h3>
+      <h3 class="section-title with-icon"><HardDrive size={17} />{$t('settings.storage.snapshotStorage')}</h3>
       <div class="field">
-        <label for="s-backups">Snapshots folder</label>
+        <label for="s-backups">{$t('settings.storage.snapshotsFolder')}</label>
         <div class="path-row">
           <input id="s-backups" bind:value={draft.backupsDir} />
-          <button class="btn" on:click={pickBackupsDir}>Browse</button>
+          <button class="btn" on:click={pickBackupsDir}>{$t('settings.storage.browse')}</button>
         </div>
-        <span class="hint">Where version-history snapshots (ZIP archives) are stored.</span>
+        <span class="hint">{$t('settings.storage.snapshotsFolderHint')}</span>
       </div>
       <div class="field">
-        <label for="s-sync-backups">Pre-sync safety backups folder</label>
+        <label for="s-sync-backups">{$t('settings.storage.safetyFolder')}</label>
         <div class="path-row">
-          <input id="s-sync-backups" bind:value={draft.syncBackupsDir} placeholder="Default: ~/.opensave/backups" />
-          <button class="btn" on:click={pickSyncBackupsDir}>Browse</button>
+          <input id="s-sync-backups" bind:value={draft.syncBackupsDir} placeholder={$t('settings.storage.safetyFolderPlaceholder')} />
+          <button class="btn" on:click={pickSyncBackupsDir}>{$t('settings.storage.browse')}</button>
         </div>
-        <span class="hint">A safety copy of your save is taken here before every incoming sync, so a bad sync is always reversible.</span>
+        <span class="hint">{$t('settings.storage.safetyFolderHint')}</span>
       </div>
     </div>
 
     <div class="card" style="margin-top: 14px;">
-      <h3 class="section-title with-icon"><Timer size={17} />Retention</h3>
+      <h3 class="section-title with-icon"><Timer size={17} />{$t('settings.storage.retention')}</h3>
       <label class="check">
         <input type="checkbox" bind:checked={draft.autoDeleteBackups} />
-        Auto-delete old automatic snapshots
+        {$t('settings.storage.autoDelete')}
       </label>
       <span class="hint">
-        The snapshots OpenSave takes on its own — before a sync replaces files, when a game saves, at a
-        conflict. Snapshots you took yourself are kept, and so is the newest one on every branch, whatever
-        its age. Runs shortly after start and every few hours.
+        {$t('settings.storage.autoDeleteHint')}
       </span>
       {#if draft.autoDeleteBackups}
         <div class="field" style="margin-top: 10px;">
-          <label for="s-days">Delete when older than</label>
+          <label for="s-days">{$t('settings.storage.deleteOlderThan')}</label>
           <select id="s-days" bind:value={draft.autoDeleteDays}>
-            <option value={7}>7 days</option>
-            <option value={14}>14 days</option>
-            <option value={30}>30 days</option>
-            <option value={60}>60 days</option>
-            <option value={90}>90 days</option>
-            <option value={180}>180 days</option>
+            <option value={7}>{$t('settings.storage.days', { n: 7 })}</option>
+            <option value={14}>{$t('settings.storage.days', { n: 14 })}</option>
+            <option value={30}>{$t('settings.storage.days', { n: 30 })}</option>
+            <option value={60}>{$t('settings.storage.days', { n: 60 })}</option>
+            <option value={90}>{$t('settings.storage.days', { n: 90 })}</option>
+            <option value={180}>{$t('settings.storage.days', { n: 180 })}</option>
           </select>
         </div>
       {/if}
     </div>
 
     <div class="card" style="margin-top: 14px;">
-      <h3 class="section-title with-icon"><History size={17} />Snapshot history</h3>
+      <h3 class="section-title with-icon"><History size={17} />{$t('settings.storage.snapshotHistory')}</h3>
       <div class="field">
-        <label for="s-max-snaps">Automatic snapshots to keep per game</label>
+        <label for="s-max-snaps">{$t('settings.storage.maxAuto')}</label>
         <input id="s-max-snaps" type="number" min="0" style="max-width: 120px;" bind:value={draft.defaultMaxSnapshots} />
         <span class="hint">
-          Default limit for newly tracked games (0 = keep everything). The oldest are pruned first,
-          per branch. Change a single game's limit in its Configuration tab.
+          {$t('settings.storage.maxAutoHint')}
         </span>
       </div>
       <div class="field">
-        <label for="s-max-manual-snaps">Manual snapshots to keep per game</label>
+        <label for="s-max-manual-snaps">{$t('settings.storage.maxManual')}</label>
         <input id="s-max-manual-snaps" type="number" min="0" style="max-width: 120px;" bind:value={draft.defaultMaxManualSnapshots} />
         <span class="hint">
-          Snapshots you take yourself have their own budget, so games that auto-save often
-          (Elden Ring, Dragonsword) can't push them out. <strong>0 = keep forever</strong>, which is
-          the default.
+          {#each segments($t('settings.storage.maxManualHint'), { forever: $t('settings.storage.keepForever') }, ['forever']) as part}{#if part.bold}<strong>{part.text}</strong>{:else}{part.text}{/if}{/each}
         </span>
       </div>
       <div class="field" style="margin-bottom: 0;">
         <div>
           <button class="btn small" disabled={pruning} on:click={cleanUpSnapshots}>
-            <BrushCleaning size={14} />{pruning ? 'Applying…' : 'Apply these limits to every game'}
+            <BrushCleaning size={14} />{pruning ? $t('settings.storage.applying') : $t('settings.storage.applyLimits')}
           </button>
         </div>
         <span class="hint">
-          Replaces each game's own limits with these, then deletes the snapshots beyond them on
-          every branch. To clean up with each game's own limits, use Space used above.
+          {$t('settings.storage.applyLimitsHint')}
         </span>
       </div>
     </div>
 
     <div class="card" style="margin-top: 14px;">
-      <h3 class="section-title with-icon"><ScanSearch size={17} />Game scanner</h3>
+      <h3 class="section-title with-icon"><ScanSearch size={17} />{$t('settings.storage.scanner')}</h3>
       <div class="field" style="margin-bottom: 0;">
-        <label for="s-scan-paths">Extra folders to scan</label>
-        <span class="hint">Scanning already checks Steam and common emulators — add custom libraries here.</span>
+        <label for="s-scan-paths">{$t('settings.storage.scanPaths')}</label>
+        <span class="hint">{$t('settings.storage.scanPathsHint')}</span>
         {#each draft.customScanPaths ?? [] as p, i}
           <div class="rule-row">
             <span class="rule-path" title={p}>{p}</span>
-            <button class="btn small ghost icon" title="Remove" aria-label="Remove" on:click={() => removeScanPath(i)}><X size={15} /></button>
+            <button class="btn small ghost icon" title={$t('settings.remove')} aria-label={$t('settings.remove')} on:click={() => removeScanPath(i)}><X size={15} /></button>
           </div>
         {/each}
-        <button id="s-scan-paths" class="btn small" on:click={addScanPath}><Plus size={14} />Add folder</button>
+        <button id="s-scan-paths" class="btn small" on:click={addScanPath}><Plus size={14} />{$t('settings.storage.addFolder')}</button>
       </div>
 
       <div class="field" style="margin: 18px 0 0;">
-        <label for="s-exclude-paths">Folders to exclude</label>
-        <span class="hint">Scans skip these folders and everything inside them — handy for stale save locations (like an old GSE saves directory) you don't want offered again.</span>
+        <label for="s-exclude-paths">{$t('settings.storage.excludePaths')}</label>
+        <span class="hint">{$t('settings.storage.excludePathsHint')}</span>
         {#each draft.excludePaths ?? [] as p, i}
           <div class="rule-row">
             <span class="rule-path" title={p}>{p}</span>
-            <button class="btn small ghost icon" title="Remove" aria-label="Remove" on:click={() => removeExcludePath(i)}><X size={15} /></button>
+            <button class="btn small ghost icon" title={$t('settings.remove')} aria-label={$t('settings.remove')} on:click={() => removeExcludePath(i)}><X size={15} /></button>
           </div>
         {/each}
-        <button id="s-exclude-paths" class="btn small" on:click={addExcludePath}><Plus size={14} />Exclude folder</button>
+        <button id="s-exclude-paths" class="btn small" on:click={addExcludePath}><Plus size={14} />{$t('settings.storage.excludeFolder')}</button>
       </div>
     </div>
 
     <div class="card" style="margin-top: 14px;">
-      <h3 class="section-title with-icon"><RotateCcw size={17} />Reset tracking</h3>
+      <h3 class="section-title with-icon"><RotateCcw size={17} />{$t('settings.reset.title')}</h3>
       <div class="field" style="margin-bottom: 0;">
-        <span class="hint">Untrack every game at once, then scan again to add them back from the correct locations — useful after moving games between launchers or drives. This only clears the tracking list; your save snapshots on disk are kept.</span>
+        <span class="hint">{$t('settings.reset.hint')}</span>
         <button
           class="btn small danger"
           style="margin-top: 12px; width: fit-content; align-self: flex-start;"
           on:click={resetTracking}
           disabled={resetting || $gameList.length === 0}
         >
-          {#if resetting}Untracking…{:else if $gameList.length === 0}No games tracked{:else}Untrack all {$gameList.length} game{$gameList.length === 1 ? '' : 's'}{/if}
+          {#if resetting}{$t('settings.reset.inProgress')}{:else if $gameList.length === 0}{$t('settings.reset.none')}{:else}{$t('settings.reset.button', { n: $gameList.length })}{/if}
         </button>
       </div>
     </div>
   {:else if tab === 'advanced'}
     <div class="card">
-      <h3 class="section-title with-icon"><Network size={17} />Network</h3>
+      <h3 class="section-title with-icon"><Network size={17} />{$t('settings.advanced.network')}</h3>
       <div class="field" style="margin-bottom: 0;">
-        <label for="s-port">Daemon port</label>
+        <label for="s-port">{$t('settings.advanced.daemonPort')}</label>
         <input id="s-port" type="number" class:invalid={unsaved.includes('port')} bind:value={draft.port} />
-        <span class="hint">The port this device listens on, for the app and for your other devices on the network. Changing it requires a restart.</span>
+        <span class="hint">{$t('settings.advanced.daemonPortHint')}</span>
       </div>
     </div>
 
     <div class="card" style="margin-top: 14px;">
-      <h3 class="section-title with-icon"><ArrowLeftRight size={17} />Cross-platform path translation</h3>
+      <h3 class="section-title with-icon"><ArrowLeftRight size={17} />{$t('settings.advanced.pathTranslation')}</h3>
       <div class="field" style="margin-bottom: 0;">
         <span class="hint">
-          Rewrites another device's save paths to this one's conventions, e.g. "C:\Users\me\Saves" → "/home/deck/saves".
+          {$t('settings.advanced.pathTranslationHint')}
         </span>
         {#each draft.pathTranslations ?? [] as rule, i}
           <div class="rule-row">
-            <input placeholder="From pattern" bind:value={rule.fromPattern} />
+            <input placeholder={$t('settings.advanced.fromPattern')} bind:value={rule.fromPattern} />
             <span class="arrow"><ArrowRight size={15} /></span>
-            <input placeholder="To pattern" bind:value={rule.toPattern} />
-            <button class="btn small ghost icon" title="Remove" aria-label="Remove" on:click={() => removeRule(i)}><X size={15} /></button>
+            <input placeholder={$t('settings.advanced.toPattern')} bind:value={rule.toPattern} />
+            <button class="btn small ghost icon" title={$t('settings.remove')} aria-label={$t('settings.remove')} on:click={() => removeRule(i)}><X size={15} /></button>
           </div>
         {/each}
-        <button id="s-rules" class="btn small" on:click={addRule}><Plus size={14} />Add rule</button>
+        <button id="s-rules" class="btn small" on:click={addRule}><Plus size={14} />{$t('settings.advanced.addRule')}</button>
       </div>
     </div>
   {:else if tab === 'support'}
@@ -691,10 +685,9 @@
       <div class="support-hero">
         <div class="support-badge"><Heart size={22} /></div>
         <div class="support-hero-text">
-          <h3 class="support-title">Support OpenSave</h3>
+          <h3 class="support-title">{$t('settings.support.title')}</h3>
           <p class="support-lede">
-            Free and open source, and it stays that way — no accounts, no ads, no telemetry,
-            and nothing locked behind a payment.
+            {$t('settings.support.lede')}
           </p>
         </div>
       </div>
@@ -702,25 +695,24 @@
       <div class="support-split">
         <div class="support-left">
           <p class="support-body">
-            It's built and maintained in spare time. If it's saved you the hassle of copying
-            save folders between machines, you're welcome to chip in.
+            {$t('settings.support.body')}
           </p>
           <ul class="support-points">
-            <li><span class="pt-icon"><Globe size={15} /></span> Keeps the public relay online</li>
-            <li><span class="pt-icon"><Gamepad2 size={15} /></span> More games and emulators detected</li>
-            <li><span class="pt-icon"><Wrench size={15} /></span> Time for fixes and new features</li>
+            <li><span class="pt-icon"><Globe size={15} /></span> {$t('settings.support.point1')}</li>
+            <li><span class="pt-icon"><Gamepad2 size={15} /></span> {$t('settings.support.point2')}</li>
+            <li><span class="pt-icon"><Wrench size={15} /></span> {$t('settings.support.point3')}</li>
           </ul>
 
           <div class="support-actions">
             <button class="btn primary support-cta" on:click={openDonatePage}>
-              {donateOpened ? 'Open again' : 'Open donation page'}<ArrowUpRight size={15} />
+              {donateOpened ? $t('settings.support.openAgain') : $t('settings.support.openDonate')}<ArrowUpRight size={15} />
             </button>
             {#if donateOpened}
-              <span class="support-opened">Opened in your browser — thank you.</span>
+              <span class="support-opened">{$t('settings.support.openedToast')}</span>
             {/if}
           </div>
           <p class="support-foot">
-            Prefer not to donate? Reporting a bug or suggesting a feature helps just as much.
+            {$t('settings.support.foot')}
           </p>
         </div>
 
@@ -729,12 +721,12 @@
                image service. Kept on a light plate because phone cameras
                struggle with inverted (light-on-dark) QR codes. -->
           <div class="qr-plate">{@html qrSvg}</div>
-          <span class="qr-caption">Scan to pay<br />from your phone</span>
+          <span class="qr-caption">{$t('settings.support.scanToPay')}<br />{$t('settings.support.fromPhone')}</span>
         </div>
       </div>
 
       <p class="support-note">
-        Payment is handled entirely by Gumroad — OpenSave never sees your card details.
+        {$t('settings.support.note')}
       </p>
     </div>
   {/if}
