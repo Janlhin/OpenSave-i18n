@@ -4,6 +4,7 @@
   import { settings, toast, askConfirm, gameList, navigate } from '../lib/stores.js';
   import { showSetupAgain } from '../lib/setup.js';
   import { api, native } from '../lib/api.js';
+  import { t, segments } from '../lib/i18n.js';
   import { adoptOutsideChanges, changedFields, createAutosave } from '../lib/autosave.js';
   import qrcode from 'qrcode-generator';
   import { DISCORD_URL, DONATE_URL } from '../lib/links.js';
@@ -94,14 +95,15 @@
   let rejected = {};
   let refusedWhy = {};
   const FIELD_NAMES = {
-    relayUrl: 'relay URL',
-    relayPort: 'relay hosting port',
-    port: 'daemon port',
-    deviceName: 'device name',
-    backupsDir: 'snapshots folder',
-    syncBackupsDir: 'safety backups folder',
-    pathTranslations: 'path rules'
+    relayUrl: 'settings.field.relayUrl',
+    relayPort: 'settings.field.relayPort',
+    port: 'settings.field.port',
+    deviceName: 'settings.field.deviceName',
+    backupsDir: 'settings.field.backupsDir',
+    syncBackupsDir: 'settings.field.syncBackupsDir',
+    pathTranslations: 'settings.field.pathTranslations'
   };
+  const fieldName = (key) => (key in FIELD_NAMES ? $t(FIELD_NAMES[key]) : key);
   $: unsaved = draft ? Object.keys(rejected).filter((key) => same(draft[key], rejected[key])) : [];
   const firstSentence = (text) => String(text).split(/(?<=\.)\s/)[0];
 
@@ -174,13 +176,13 @@
     try {
       // Save the limit first so the cleanup uses it, then prune everything.
       await saver.flush();
-      if (saveState?.error) throw new Error(`the limits couldn't be saved: ${saveState.error}`);
+      if (saveState?.error) throw new Error($t('settings.cleanUp.saveFailed', { error: saveState.error }));
       const res = await api.post('/api/snapshots/prune', { applyDefaultToAll: true });
       const mb = (res.freedBytes / 1048576).toFixed(1);
       toast(
         res.removed > 0
-          ? `Removed ${res.removed} old snapshot${res.removed === 1 ? '' : 's'}, freed ${mb} MB`
-          : 'Nothing to clean up — all games are within their limit',
+          ? $t('settings.cleanUp.removed', { n: res.removed, mb })
+          : $t('settings.cleanUp.none'),
         'success'
       );
     } catch (e) {
@@ -201,7 +203,7 @@
 
   // Custom scan paths
   async function addScanPath() {
-    const dir = await native.selectDirectory('Add a folder to scan');
+    const dir = await native.selectDirectory($t('settings.storage.scanAddDialog'));
     if (dir) draft.customScanPaths = [...(draft.customScanPaths ?? []), dir];
     saveNow();
   }
@@ -212,7 +214,7 @@
 
   // Excluded folders — locations the scan should skip entirely.
   async function addExcludePath() {
-    const dir = await native.selectDirectory('Choose a folder to exclude from scans');
+    const dir = await native.selectDirectory($t('settings.storage.excludeAddDialog'));
     if (dir) draft.excludePaths = [...(draft.excludePaths ?? []), dir];
     saveNow();
   }
@@ -229,15 +231,16 @@
   async function resetTracking() {
     const n = $gameList.length;
     if (n === 0) return;
-    const ok = await askConfirm(
-      `Untrack all ${n} game${n === 1 ? '' : 's'}? They'll be removed from your library so you can re-add them from the correct locations. Your save snapshots on disk are kept — nothing is deleted.`,
-      { title: 'Reset tracking?', confirmText: `Untrack ${n}`, danger: true }
-    );
+    const ok = await askConfirm($t('settings.reset.confirmBody', { n }), {
+      title: $t('settings.reset.confirmTitle'),
+      confirmText: $t('settings.reset.confirmAction', { n }),
+      danger: true
+    });
     if (!ok) return;
     resetting = true;
     try {
       const res = await api.post('/api/games/untrack-bulk', { all: true });
-      toast(`Untracked ${res.untracked} game${res.untracked === 1 ? '' : 's'} — snapshots kept`, 'success');
+      toast($t('settings.reset.doneToast', { n: res.untracked }), 'success');
     } catch (e) {
       toast(e.message, 'error');
     } finally {
@@ -246,13 +249,13 @@
   }
 
   async function pickBackupsDir() {
-    const dir = await native.selectDirectory('Select snapshots storage folder');
+    const dir = await native.selectDirectory($t('settings.storage.pickDialog'));
     if (dir) draft.backupsDir = dir;
     saveNow();
   }
 
   async function pickSyncBackupsDir() {
-    const dir = await native.selectDirectory('Select pre-sync safety backups folder');
+    const dir = await native.selectDirectory($t('settings.storage.pickSyncDialog'));
     if (dir) draft.syncBackupsDir = dir;
     saveNow();
   }
@@ -287,22 +290,22 @@
 </script>
 
 <div class="head">
-  <h2 class="page-title">Settings</h2>
+  <h2 class="page-title">{$t('settings.title')}</h2>
   {#if draft}
     <span class="save-state" class:error={saveState?.error || unsaved.length} aria-live="polite">
       {#if saveState === 'saving'}
-        <LoaderCircle size={14} class="spin" />Saving…
+        <LoaderCircle size={14} class="spin" />{$t('settings.saveState.saving')}
       {:else if unsaved.length}
         <TriangleAlert size={14} />
         <span class="why" title={refusedWhy[unsaved[0]]}>
-          Not saved: the {FIELD_NAMES[unsaved[0]] ?? unsaved[0]} — {firstSentence(refusedWhy[unsaved[0]])}
+          {$t('settings.saveState.notSaved', { field: fieldName(unsaved[0]), why: firstSentence(refusedWhy[unsaved[0]]) })}
         </span>
       {:else if saveState?.error}
-        <TriangleAlert size={14} /><span class="why" title={saveState.error}>Couldn't save: {firstSentence(saveState.error)}</span>
+        <TriangleAlert size={14} /><span class="why" title={saveState.error}>{$t('settings.saveState.saveFailed', { error: firstSentence(saveState.error) })}</span>
       {:else if saveState === 'saved'}
-        <Check size={14} />Saved
+        <Check size={14} />{$t('settings.saveState.saved')}
       {:else}
-        Changes save as you make them
+        {$t('settings.saveState.autosave')}
       {/if}
     </span>
   {/if}
@@ -312,14 +315,14 @@
   <Skeleton kind="cards" count={3} />
 {:else}
   <div class="pill-tabs" style="margin-bottom: 18px;" use:slidingIndicator={{ inset: 10 }}>
-    <button class:active={tab === 'general'} on:click={() => showTab('general')}>General</button>
-    <button class:active={tab === 'sync'} on:click={() => showTab('sync')}>Sync</button>
-    <button class:active={tab === 'storage'} on:click={() => showTab('storage')}>Storage</button>
-    <button class:active={tab === 'advanced'} on:click={() => showTab('advanced')}>Advanced</button>
-    <button class="support-tab" class:active={tab === 'support'} on:click={() => showTab('support')}><Heart size={14} />Support</button>
+    <button class:active={tab === 'general'} on:click={() => showTab('general')}>{$t('settings.tab.general')}</button>
+    <button class:active={tab === 'sync'} on:click={() => showTab('sync')}>{$t('settings.tab.sync')}</button>
+    <button class:active={tab === 'storage'} on:click={() => showTab('storage')}>{$t('settings.tab.storage')}</button>
+    <button class:active={tab === 'advanced'} on:click={() => showTab('advanced')}>{$t('settings.tab.advanced')}</button>
+    <button class="support-tab" class:active={tab === 'support'} on:click={() => showTab('support')}><Heart size={14} />{$t('settings.tab.support')}</button>
     <!-- Not a tab: it leaves the app. Shaped like its neighbour so the pair
          reads as one group, marked with an outward arrow so nobody expects a panel. -->
-    <button class="discord-tab" on:click={() => native.openExternal(DISCORD_URL)} title="Open the OpenSave Discord in your browser">
+    <button class="discord-tab" on:click={() => native.openExternal(DISCORD_URL)} title={$t('settings.discord.title')}>
       <span class="discord-glyph" aria-hidden="true">
         <svg viewBox="0 0 24 18" width="17" height="13" fill="currentColor">
           <path d="M20.32 1.53A19.8 19.8 0 0 0 15.43 0c-.21.38-.46.9-.63 1.31a18.3 18.3 0 0 0-5.6 0C9.03.9 8.77.38 8.56 0A19.74 19.74 0 0 0 3.67 1.53C.57 6.19-.27 10.73.15 15.21A19.9 19.9 0 0 0 6.18 18c.49-.66.92-1.37 1.29-2.11-.71-.27-1.39-.6-2.03-.98.17-.13.34-.26.5-.4a14.2 14.2 0 0 0 12.12 0c.16.14.33.27.5.4-.64.38-1.32.71-2.03.98.37.74.8 1.45 1.29 2.11a19.87 19.87 0 0 0 6.03-2.79c.5-5.19-.84-9.69-3.53-13.68ZM8.02 12.46c-1.18 0-2.15-1.08-2.15-2.4s.95-2.4 2.15-2.4c1.2 0 2.17 1.09 2.15 2.4 0 1.32-.95 2.4-2.15 2.4Zm7.96 0c-1.18 0-2.15-1.08-2.15-2.4s.95-2.4 2.15-2.4c1.2 0 2.17 1.09 2.15 2.4 0 1.32-.95 2.4-2.15 2.4Z" />
@@ -340,188 +343,178 @@
   >
   {#if tab === 'general'}
     <div class="card">
-      <h3 class="section-title with-icon"><Monitor size={17} />Device identity</h3>
+      <h3 class="section-title with-icon"><Monitor size={17} />{$t('settings.general.deviceIdentity')}</h3>
       <div class="field">
-        <label for="s-name">Device name — how other devices see you</label>
+        <label for="s-name">{$t('settings.general.deviceName')}</label>
         <input id="s-name" class:invalid={unsaved.includes('deviceName')} bind:value={draft.deviceName} />
       </div>
       <div class="field">
-        <label for="s-type">Device type</label>
+        <label for="s-type">{$t('settings.general.deviceType')}</label>
         <select id="s-type" bind:value={draft.deviceType}>
-          <option value="desktop">Desktop (Windows / macOS / Linux PC)</option>
-          <option value="deck">Steam Deck (SteamOS handheld)</option>
-          <option value="handheld">Handheld (ROG Ally / Legion Go / emulator)</option>
-          <option value="mobile">Companion (mobile device)</option>
+          <option value="desktop">{$t('settings.general.type.desktop')}</option>
+          <option value="deck">{$t('settings.general.type.deck')}</option>
+          <option value="handheld">{$t('settings.general.type.handheld')}</option>
+          <option value="mobile">{$t('settings.general.type.mobile')}</option>
         </select>
-        <span class="hint">Shown to other devices when they discover you.</span>
+        <span class="hint">{$t('settings.general.typeHint')}</span>
       </div>
       <div class="field">
-        <label for="s-node">Device ID</label>
+        <label for="s-node">{$t('settings.general.deviceId')}</label>
         <input id="s-node" value={draft.nodeId ?? ''} readonly class="mono" />
-        <span class="hint">This device's unique network identifier (read-only).</span>
+        <span class="hint">{$t('settings.general.deviceIdHint')}</span>
       </div>
     </div>
 
     <!-- Kept on this device rather than in the daemon's settings, like the
          library view below. -->
     <div class="card" style="margin-top: 14px;">
-      <h3 class="section-title with-icon"><Palette size={17} />Appearance</h3>
+      <h3 class="section-title with-icon"><Palette size={17} />{$t('settings.general.appearance')}</h3>
       <AppearanceOptions />
     </div>
 
     <!-- Using OpenSave from a gamepad: a Steam Deck, a handheld, a pad on a
          PC. Also on this device only. -->
     <div class="card" style="margin-top: 14px;">
-      <h3 class="section-title with-icon"><Gamepad2 size={17} />Controller</h3>
+      <h3 class="section-title with-icon"><Gamepad2 size={17} />{$t('settings.general.controller')}</h3>
       <ControllerOptions />
     </div>
 
     <div class="card" style="margin-top: 14px;">
-      <h3 class="section-title with-icon"><Bell size={17} />Notifications</h3>
+      <h3 class="section-title with-icon"><Bell size={17} />{$t('settings.general.notifications')}</h3>
       <NotificationOptions />
     </div>
 
     <!-- The same thing the View menu on the library changes, kept on this
          device: see lib/libraryview.js for why. -->
     <div class="card" style="margin-top: 14px;">
-      <h3 class="section-title with-icon"><LayoutGrid size={17} />Library</h3>
-      <p class="hint library-hint">How your games are laid out on Home. Changes apply straight away.</p>
+      <h3 class="section-title with-icon"><LayoutGrid size={17} />{$t('settings.general.library')}</h3>
+      <p class="hint library-hint">{$t('settings.general.libraryHint')}</p>
       <LibraryViewOptions />
       <div class="guide-row">
         <div>
-          <strong>Setup guide</strong>
-          <p class="hint">The getting-started checklist on Home: find your saves, add your other devices, back up to the cloud.</p>
+          <strong>{$t('settings.general.setupGuide')}</strong>
+          <p class="hint">{$t('settings.general.setupGuideHint')}</p>
         </div>
-        <button class="btn small" on:click={() => { showSetupAgain(); navigate('home'); }}>Show it again</button>
+        <button class="btn small" on:click={() => { showSetupAgain(); navigate('home'); }}>{$t('settings.general.showSetupAgain')}</button>
       </div>
     </div>
 
     <div class="card" style="margin-top: 14px;">
-      <h3 class="section-title with-icon"><Rocket size={17} />Startup</h3>
+      <h3 class="section-title with-icon"><Rocket size={17} />{$t('settings.general.startup')}</h3>
       <label class="check">
         <input type="checkbox" bind:checked={draft.startOnBoot} />
-        Start OpenSave when the computer starts
+        {$t('settings.general.startOnBoot')}
       </label>
       <p class="hint" style="margin-top: 6px;">
-        Launches minimized to the system tray so syncing runs in the background.
+        {$t('settings.general.startOnBootHint')}
       </p>
     </div>
 
     <div class="card" style="margin-top: 14px;">
-      <h3 class="section-title with-icon"><Download size={17} />Updates</h3>
+      <h3 class="section-title with-icon"><Download size={17} />{$t('settings.general.updates')}</h3>
       <label class="check">
         <input
           type="checkbox"
           checked={draft.updateChannel === 'beta'}
           on:change={(e) => (draft.updateChannel = e.currentTarget.checked ? 'beta' : 'stable')}
         />
-        Offer me beta versions
+        {$t('settings.general.offerBetas')}
       </label>
       <p class="hint" style="margin-top: 6px;">
         {#if onPreRelease}
-          You're running <strong>{appVersion}</strong>, which is a beta, so you'll be offered newer
-          betas whether or not this is ticked — otherwise there'd be no way forward until the final
-          release caught up. Untick it and you'll move to the stable release as soon as it's newer
-          than what you have.
+          {#each segments($t('settings.general.betasOnPreRelease'), { version: appVersion }, ['version']) as part}{#if part.bold}<strong>{part.text}</strong>{:else}{part.text}{/if}{/each}
         {:else}
-          Betas ship early with the newest fixes and are less tested. You'll be offered the stable
-          release whenever it's newer, so this isn't a one-way door.
+          {$t('settings.general.betasStable')}
         {/if}
       </p>
     </div>
 
   {:else if tab === 'sync'}
     <div class="card">
-      <h3 class="section-title with-icon"><RefreshCw size={17} />Sync behavior</h3>
+      <h3 class="section-title with-icon"><RefreshCw size={17} />{$t('settings.sync.behavior')}</h3>
       <label class="check">
         <input type="checkbox" bind:checked={draft.autoSyncOnTrack} />
-        Sync a game immediately when it's first tracked
+        {$t('settings.sync.autoSyncOnTrack')}
       </label>
       <label class="check" style="margin-top: 18px;">
         <input type="checkbox" bind:checked={draft.detectNewGames} />
-        Tell me when a game turns up with saves OpenSave isn't keeping
+        {$t('settings.sync.detectNewGames')}
       </label>
       <span class="hint" style="margin-top: 6px;">
-        OpenSave looks every hour, in the background, and only mentions games it hasn't seen before.
-        Nothing is tracked until you choose it.
+        {$t('settings.sync.detectNewGamesHint')}
       </span>
       <label class="check" style="margin-top: 18px;">
         <input type="checkbox" bind:checked={draft.matchByAppId} />
-        Match saves across PCs by Steam App ID
+        {$t('settings.sync.matchByAppId')}
       </label>
       <span class="hint" style="margin-top: 6px;">
-        Links the same game across devices even when it was tracked under different names or drives.
+        {$t('settings.sync.matchByAppIdHint')}
         <MoreInfo>
-          For example a Steam copy on one PC and a standalone copy on another. Leave this off if you
-          deliberately keep two separate copies of the same game that shouldn't merge. You can always
-          link games by hand from a game's page.
+          {$t('settings.sync.matchByAppIdMore')}
         </MoreInfo>
       </span>
         <div class="field" style="margin-top: 18px;">
-          <label for="s-unknown-game">When another device syncs a game this one doesn't have</label>
+          <label for="s-unknown-game">{$t('settings.sync.unknownGameLabel')}</label>
           <select id="s-unknown-game" bind:value={draft.unknownGameFromPeer}>
-            <option value="track">Start tracking it automatically (recommended)</option>
-            <option value="ask">Ask me where to keep it</option>
+            <option value="track">{$t('settings.sync.unknownGame.track')}</option>
+            <option value="ask">{$t('settings.sync.unknownGame.ask')}</option>
           </select>
           <span class="hint">
-            Tracking automatically works out a folder from where the game lives on the other
-            device, which is why OpenSave usually needs no setup.
+            {$t('settings.sync.unknownGameHint')}
             <MoreInfo>
-              Choose <em>Ask me</em> if your saves are somewhere that guess would get wrong — a
-              second drive, a folder you moved, or a game that keeps saves in a folder named after
-              your account. Games waiting for a folder appear on the Home page.
+              {#each segments($t('settings.sync.unknownGameMore'), { askMe: $t('settings.sync.askShort') }, ['askMe']) as part}{#if part.bold}<em>{part.text}</em>{:else}{part.text}{/if}{/each}
             </MoreInfo>
           </span>
         </div>
       <div class="field" style="margin-top: 14px;">
-        <label for="s-limit">Internet bandwidth limit</label>
+        <label for="s-limit">{$t('settings.sync.bandwidthLimit')}</label>
         <select id="s-limit" bind:value={draft.speedLimit}>
-          <option value={0}>Unlimited (max speed)</option>
-          <option value={100}>100 KB/s (very low)</option>
-          <option value={500}>500 KB/s (medium)</option>
-          <option value={1024}>1 MB/s (high)</option>
-          <option value={5120}>5 MB/s (very high)</option>
-          <option value={10240}>10 MB/s (ultra)</option>
+          <option value={0}>{$t('settings.sync.speed.unlimited')}</option>
+          <option value={100}>{$t('settings.sync.speed.low')}</option>
+          <option value={500}>{$t('settings.sync.speed.medium')}</option>
+          <option value={1024}>{$t('settings.sync.speed.high')}</option>
+          <option value={5120}>{$t('settings.sync.speed.veryHigh')}</option>
+          <option value={10240}>{$t('settings.sync.speed.ultra')}</option>
         </select>
-        <span class="hint">Only applies to relay (internet) syncs — LAN is never throttled.</span>
+        <span class="hint">{$t('settings.sync.speedHint')}</span>
       </div>
     </div>
 
     <div class="card" style="margin-top: 14px;">
-      <h3 class="section-title with-icon"><Globe size={17} />Internet relay</h3>
+      <h3 class="section-title with-icon"><Globe size={17} />{$t('settings.sync.relay')}</h3>
       <div class="field">
-        <label for="s-relay-url">WebSocket relay URL</label>
+        <label for="s-relay-url">{$t('settings.sync.relayUrl')}</label>
         <input id="s-relay-url" class:invalid={unsaved.includes('relayUrl')} bind:value={draft.relayUrl} placeholder="wss://relay.opensave.org" />
-        <span class="hint">The relay that carries syncs across the internet. Join a room from <strong>Internet Sync</strong>.</span>
+        <span class="hint">{#each segments($t('settings.sync.relayUrlHint'), { internetSync: $t('settings.sync.internetSync') }, ['internetSync']) as part}{#if part.bold}<strong>{part.text}</strong>{:else}{part.text}{/if}{/each}</span>
       </div>
       <label class="check">
         <input type="checkbox" bind:checked={draft.hostRelay} />
-        Host a WAN relay server on this device
+        {$t('settings.sync.hostRelay')}
       </label>
       <p class="hint" style="margin-top: 6px;">
-        Lets friends connect directly to you instead of the public relay.
+        {$t('settings.sync.hostRelayHint')}
       </p>
       {#if draft.hostRelay}
         <div class="field" style="margin-top: 12px;">
-          <label for="s-relay-port">Relay hosting port</label>
+          <label for="s-relay-port">{$t('settings.sync.relayPort')}</label>
           <input id="s-relay-port" type="number" class:invalid={unsaved.includes('relayPort')} bind:value={draft.relayPort} />
-          <span class="hint">Forward this TCP port on your router so friends on the internet can reach you.</span>
+          <span class="hint">{$t('settings.sync.relayPortHint')}</span>
         </div>
         <button class="btn small" on:click={toggleRelayInfo} disabled={relayInfoLoading}>
           {#if relayInfoLoading}
-            Looking up…
+            {$t('settings.sync.lookingUp')}
           {:else if relayInfoShown}
-            Hide my addresses
+            {$t('settings.sync.hideAddresses')}
           {:else}
-            Show my addresses to share
+            {$t('settings.sync.showAddresses')}
           {/if}
         </button>
         {#if relayInfoShown && relayInfo}
           <div class="share-banner">
-            <div class="share-title with-icon"><RadioTower size={15} />Share these with your friend</div>
-            <div class="share-row"><span>LAN IPs:</span> {relayInfo.lanIps?.join(', ') || '—'}</div>
-            <div class="share-row"><span>Public IP:</span> {relayInfo.publicIp || 'unavailable'}</div>
-            <div class="share-row"><span>Relay port:</span> {relayInfo.relayPort}</div>
+            <div class="share-title with-icon"><RadioTower size={15} />{$t('settings.sync.shareTitle')}</div>
+            <div class="share-row"><span>{$t('settings.sync.lanIps')}</span> {relayInfo.lanIps?.join(', ') || '—'}</div>
+            <div class="share-row"><span>{$t('settings.sync.publicIp')}</span> {relayInfo.publicIp || $t('settings.sync.unavailable')}</div>
+            <div class="share-row"><span>{$t('settings.sync.relayPortLabel')}</span> {relayInfo.relayPort}</div>
           </div>
         {/if}
       {/if}
@@ -529,13 +522,12 @@
 
     <div class="card moved" style="margin-top: 14px;">
       <div>
-        <h3 class="section-title with-icon"><Cloud size={17} />Cloud backup</h3>
+        <h3 class="section-title with-icon"><Cloud size={17} />{$t('home.cloudBackup')}</h3>
         <p class="hint">
-          Where backups go, whether every snapshot is sent there, and whether newer saves are
-          brought from your other devices are all set on the Cloud Backup page.
+          {$t('settings.sync.cloudBackupHint')}
         </p>
       </div>
-      <button class="btn" on:click={() => navigate('cloud')}>Open Cloud Backup</button>
+      <button class="btn" on:click={() => navigate('cloud')}>{$t('settings.sync.openCloudBackup')}</button>
     </div>
   {:else if tab === 'storage'}
     <div class="card">
