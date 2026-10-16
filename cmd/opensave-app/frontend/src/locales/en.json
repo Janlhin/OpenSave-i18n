@@ -1511,5 +1511,6 @@
   "controller.mode.on": "On",
   "controller.mode.off": "Off",
   "snapshots.kind.automatic": "Automatic",
-  "snapshots.kind.snapshot": "Snapshot"
+  "snapshots.kind.snapshot": "Snapshot",
+  "settings.appearance.scaleDefault": "(default)"
 }

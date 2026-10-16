@@ -1325,5 +1325,6 @@
   "controller.mode.on": "开",
   "controller.mode.off": "关",
   "snapshots.kind.automatic": "自动",
-  "snapshots.kind.snapshot": "快照"
+  "snapshots.kind.snapshot": "快照",
+  "settings.appearance.scaleDefault": "(默认)"
 }
