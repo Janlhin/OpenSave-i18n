@@ -6,6 +6,7 @@
   import { toast, cloudAuthEvent } from '../../lib/stores.js';
   import { api, native } from '../../lib/api.js';
   import { isOAuth, isEmail, providerById } from '../../lib/cloudproviders.js';
+  import { t } from '../../lib/i18n.js';
   import ProviderIcon from './ProviderIcon.svelte';
   import Spinner from '../../components/ui/Spinner.svelte';
   import TriangleAlert from 'lucide-svelte/icons/triangle-alert';
@@ -32,10 +33,10 @@
     authInProgress = false;
     showManualCode = false;
     if (ev.success) {
-      toast(`Connected as ${ev.userEmail}`, 'success');
+      toast($t('cloud.connect.connectedAs', { email: ev.userEmail }), 'success');
       reload();
     } else {
-      toast(ev.error ?? 'Sign-in failed', 'error');
+      toast(ev.error ?? $t('cloud.connect.signInFailed'), 'error');
     }
   });
   onDestroy(unsubAuth);
@@ -49,9 +50,9 @@
       authAuto = !!res.autoCallback;
       showManualCode = !authAuto;
       if (authAuto) {
-        toast('Finish signing in — OpenSave connects automatically.');
+        toast($t('cloud.connect.finishSignIn'));
       } else {
-        toast('Sign in using the browser window, then paste the code from the redirect URL here.');
+        toast($t('cloud.connect.pasteCode'));
       }
     } catch (e) {
       toast(e.message, 'error');
@@ -70,7 +71,7 @@
     busy.set(true);
     try {
       const res = await api.post('/api/auth/callback', { code: authCode.trim() });
-      toast(`Connected as ${res.userEmail}`, 'success');
+      toast($t('cloud.connect.connectedAs', { email: res.userEmail }), 'success');
       authInProgress = false;
       showManualCode = false;
       authCode = '';
@@ -86,7 +87,7 @@
     busy.set(true);
     try {
       await api.post('/api/auth/disconnect');
-      toast('Disconnected');
+      toast($t('cloud.connect.disconnected'));
       await reload();
     } catch (e) {
       toast(e.message, 'error');
@@ -101,54 +102,51 @@
     <div class="acct">
       <div class="acct-icon"><ProviderIcon provider={current} size={26} /></div>
       <div class="acct-info">
-        <div class="acct-title">Connected to {current?.label}</div>
+        <div class="acct-title">{$t('cloud.connect.connectedTo', { provider: current?.label })}</div>
         <div class="acct-sub">
           <span class="acct-dot"></span>
-          {isEmail(config.tokens.userEmail) ? config.tokens.userEmail : 'Signed in — new snapshots upload automatically'}
+          {isEmail(config.tokens.userEmail) ? config.tokens.userEmail : $t('cloud.connect.signedInAuto')}
         </div>
       </div>
-      <button class="btn small danger" disabled={$busy} on:click={disconnect}>Disconnect</button>
+      <button class="btn small danger" disabled={$busy} on:click={disconnect}>{$t('cloud.connect.disconnectBtn')}</button>
     </div>
   {:else}
     {#if connected}
       <p class="quiet" style="margin-bottom: 10px;">
-        You're currently connected to {providerById(connected)?.label} — signing in
-        here will replace that connection.
+        {$t('cloud.connect.replaceWarning', { provider: providerById(connected)?.label })}
       </p>
     {/if}
     {#if !authInProgress}
       <button class="btn primary" disabled={$busy} on:click={startAuth}>
-        Sign in with {current?.label}
+        {$t('cloud.connect.signInWith', { provider: current?.label })}
       </button>
       {#if config.provider === 'google_drive'}
         <p class="quiet" style="margin-top: 10px;">
-          <TriangleAlert size={14} class="inline-icon warn-icon" />On Google's consent screen, <strong>tick the checkbox</strong> allowing OpenSave to access
-          its own Drive files — without it, uploads fail with "insufficient permissions".
+          <TriangleAlert size={14} class="inline-icon warn-icon" />{$t('cloud.connect.googleConsent1')}<strong>{$t('cloud.connect.googleConsentTick')}</strong>{$t('cloud.connect.googleConsent2')}
         </p>
       {/if}
     {:else}
       <div class="waiting">
         <Spinner size={16} />
         <div class="waiting-text">
-          <strong>Waiting for you to finish signing in…</strong>
-          <span class="quiet">Approve access in your browser — OpenSave connects by itself.</span>
+          <strong>{$t('cloud.connect.waitingTitle')}</strong>
+          <span class="quiet">{$t('cloud.connect.waitingSub')}</span>
         </div>
-        <button class="btn small" on:click={cancelAuth}>Cancel</button>
+        <button class="btn small" on:click={cancelAuth}>{$t('common.cancel')}</button>
       </div>
       {#if !showManualCode && authAuto}
         <button class="linkish" on:click={() => (showManualCode = true)}>
-          Having trouble? Paste the code manually
+          {$t('cloud.connect.pasteManually')}
         </button>
       {/if}
       {#if showManualCode}
         <div class="code">
           <p class="quiet">
-            After approving access, the browser lands on a localhost page. Copy the <code>code</code> value
-            from its address bar and paste it here:
+            {$t('cloud.connect.codeHelp1')}<code>{$t('cloud.connect.codeWord')}</code>{$t('cloud.connect.codeHelp2')}
           </p>
           <div class="path-row">
             <input placeholder="4/0AY0e-g7…" bind:value={authCode} />
-            <button class="btn primary" disabled={!authCode || $busy} on:click={finishAuth}>Connect</button>
+            <button class="btn primary" disabled={!authCode || $busy} on:click={finishAuth}>{$t('cloud.connect.connectBtn')}</button>
           </div>
         </div>
       {/if}
