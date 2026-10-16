@@ -15,15 +15,11 @@
 
 需要的话直接从 **`feat/i18n-full-coverage`** 分支取（整个分支自洽，可独立构建）。PR 我会按 view 分小批慢慢推到上游（`dev-public`）——如果和你在做的工作有重叠，随时联系我协调，以避免冲突。
 
-繁体目前是 OpenCC + 机器润色的基线，我是简体用户，语感上的歧义欢迎繁体用户开 issue 指正，我会照单全收。
-
 **English**:
 
 Hi — the full i18n extraction for OpenSave is done: three catalogs (`en` / `zh-Hans` / `zh-Hant`, 1328 keys), every window UI extracted to keys, including the lib-layer dynamic text (time formats, activity descriptions, notifications, sort names, appearance options). `npm test` 310/310, clean build, and the two runtime crashes introduced along the way (TransfersPanel alias leftovers, a timeline crash on missing timestamps) are fixed and verified.
 
 Feel free to take anything you need from the **`feat/i18n-full-coverage`** branch — it's self-contained and builds standalone. I'll be pushing PRs to upstream (`dev-public`) view by view; if anything overlaps with your work, ping me and let's coordinate.
-
-Traditional Chinese is an OpenCC + machine-polished baseline — I'm a simplified-Chinese user, so if anything reads oddly, issues from traditional users are very welcome and will be happily applied.
 
 ---
 
