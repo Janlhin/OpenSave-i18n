@@ -1506,5 +1506,10 @@
   "cloud.provider.webhook": "HTTP Webhook",
   "cloud.picker.clickToSignIn": "Click to sign in",
   "cloud.picker.configured": "Configured",
-  "cloud.picker.notConfigured": "Not configured"
+  "cloud.picker.notConfigured": "Not configured",
+  "controller.mode.auto": "Automatic",
+  "controller.mode.on": "On",
+  "controller.mode.off": "Off",
+  "snapshots.kind.automatic": "Automatic",
+  "snapshots.kind.snapshot": "Snapshot"
 }

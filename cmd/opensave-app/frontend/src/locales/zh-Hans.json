@@ -1320,5 +1320,10 @@
   "cloud.provider.webhook": "HTTP Webhook",
   "cloud.picker.clickToSignIn": "点击登录",
   "cloud.picker.configured": "已配置",
-  "cloud.picker.notConfigured": "未配置"
+  "cloud.picker.notConfigured": "未配置",
+  "controller.mode.auto": "自动",
+  "controller.mode.on": "开",
+  "controller.mode.off": "关",
+  "snapshots.kind.automatic": "自动",
+  "snapshots.kind.snapshot": "快照"
 }
