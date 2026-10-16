@@ -1373,5 +1373,92 @@
   "settings.appearance.reducedMotion": "Off for now whatever this says: Windows is asking apps to reduce motion.",
   "appearance.theme.dark": "Dark",
   "appearance.theme.light": "Light",
-  "appearance.theme.system": "Match system"
+  "appearance.theme.system": "Match system",
+  "activity.day.today": "Today",
+  "activity.day.yesterday": "Yesterday",
+  "activity.event.received": {
+    "one": "Got 1 file from {device}{where}",
+    "other": "Got {n} files from {device}{where}"
+  },
+  "activity.event.receivedAny": "Got files from {device}{where}",
+  "activity.event.sent": {
+    "one": "{device} took 1 file from here{where}",
+    "other": "{device} took {n} files from here{where}"
+  },
+  "activity.event.sentAny": "{device} took files from here{where}",
+  "activity.event.deleted": {
+    "one": "Deleted 1 file as {device} did{where}",
+    "other": "Deleted {n} files as {device} did{where}"
+  },
+  "activity.event.deletedAny": "Deleted files as {device} did{where}",
+  "activity.event.restoredWhen": "Put back the snapshot of {when}",
+  "activity.event.restored": "Put back a snapshot",
+  "activity.event.cloudPulled": "Brought {device}'s newer save from the cloud",
+  "activity.event.emptied": "Every save file was deleted here",
+  "activity.event.keptElsewhere": {
+    "one": "1 file kept on your other devices until you chose",
+    "other": "{n} files kept on your other devices until you chose"
+  },
+  "activity.event.conflict": "Changed here and on {device} at once{where}",
+  "activity.event.neededDecision": "Needed a decision",
+  "activity.event.playedFor": "Played for {length}",
+  "activity.event.played": "Played",
+  "activity.event.onThisDevice": "On this device",
+  "activity.event.keptCopy": "Kept a copy of {device}'s save",
+  "activity.event.snapshot": "Snapshot",
+  "activity.event.snapshotManual": "Snapshot: {comment}",
+  "activity.event.takenByYou": "Taken by you",
+  "activity.event.saveChanged": "Save changed",
+  "activity.event.trackingStart": "When tracking started",
+  "activity.event.inLocation": " in its “{root}” location",
+  "appearance.accent.rose": "Rose",
+  "appearance.accent.red": "Red",
+  "appearance.accent.orange": "Orange",
+  "appearance.accent.amber": "Amber",
+  "appearance.accent.gold": "Gold",
+  "appearance.accent.yellow": "Yellow",
+  "appearance.accent.lime": "Lime",
+  "appearance.accent.green": "Green",
+  "appearance.accent.emerald": "Emerald",
+  "appearance.accent.teal": "Teal",
+  "appearance.accent.cyan": "Cyan",
+  "appearance.accent.sky": "Sky",
+  "appearance.accent.blue": "Blue",
+  "appearance.accent.indigo": "Indigo",
+  "appearance.accent.violet": "Violet",
+  "appearance.accent.purple": "Purple",
+  "appearance.accent.pink": "Pink",
+  "appearance.accent.slate": "Slate",
+  "gameStatus.elsewhere": "Not on this device",
+  "gameStatus.missing": "Save folder missing",
+  "gameStatus.emptied": "Files deleted — needs a decision",
+  "gameStatus.restoring": "Putting files back",
+  "gameStatus.conflict": "Needs a decision",
+  "gameStatus.inSession": "In session",
+  "gameStatus.inSessionFor": "In session for {length}",
+  "gameStatus.syncing": "Syncing {pct}%",
+  "gameStatus.error": "Last sync failed",
+  "gameStatus.paused": "Auto-sync off",
+  "gameStatus.synced": "Synced {when}",
+  "gameStatus.unsynced": "Not synced yet",
+  "gameStatus.local": "Snapshot {when}",
+  "gameStatus.empty": "No snapshots yet",
+  "timeAgo.justNow": "just now",
+  "timeAgo.aMinuteAgo": "a minute ago",
+  "timeAgo.minutesAgo": {
+    "one": "1 minute ago",
+    "other": "{n} minutes ago"
+  },
+  "timeAgo.anHourAgo": "an hour ago",
+  "timeAgo.hoursAgo": {
+    "one": "1 hour ago",
+    "other": "{n} hours ago"
+  },
+  "timeAgo.yesterday": "yesterday",
+  "timeAgo.daysAgo": {
+    "one": "1 day ago",
+    "other": "{n} days ago"
+  },
+  "timeAgo.onDate": "on {date}",
+  "timeAgo.never": "never"
 }

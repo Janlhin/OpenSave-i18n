@@ -11,8 +11,16 @@
   import { api, gameCover } from '../lib/api.js';
   import { stateLoaded, games, conflicts, locationConflicts, pairingRequests, cloudOffers, newGames, navigate, activityTick, availableUpdate } from '../lib/stores.js';
   import { waitingOnYou, happened, badgeCount, loadSeenAt, saveSeenAt, exampleEvents } from '../lib/notifications.js';
-  import { timeAgo } from '../lib/timeago.js';
+  import { timeAgoParts } from '../lib/timeago.js';
   import { t } from '../lib/i18n.js';
+
+  // timeAgo's facts as a catalog key and its params, ready for $t.
+  const agoKey = (at, now = Date.now()) => {
+    const p = timeAgoParts(at, now);
+    if (p.kind === 'invalid') return { text: p.text };
+    const { kind, ...params } = p;
+    return { key: 'timeAgo.' + kind, params };
+  };
 
   let open = false;
   let items = [];
@@ -126,6 +134,7 @@
         {#if events.length}
           <div class="section">{$t('notifications.earlier')}</div>
           {#each events as e, i (e.id)}
+            {@const w = agoKey(iso(e.atMs), now)}
             <button class="item" class:unread={e.unread} style="--i: {Math.min(waiting.length + i, 10)}" on:click={() => go(e)}>
               {#if e.example}
                 <span class="thumb icon"><Info size={15} /></span>
@@ -134,7 +143,7 @@
               {/if}
               <span class="text">
                 <span class="t">{e.title}</span>
-                <span class="d">{e.detail ? `${e.detail} · ` : ''}{timeAgo(iso(e.atMs), now)}</span>
+                <span class="d">{e.detail ? `${e.detail} · ` : ''}{w.text ?? $t(w.key, w.params)}</span>
               </span>
               {#if e.unread}<span class="dot" aria-label={$t('notifications.unread')}></span>{/if}
             </button>
