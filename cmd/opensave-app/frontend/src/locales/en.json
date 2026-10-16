@@ -1293,5 +1293,21 @@
   "internetSync.reconnectingRoomToast": "Reconnecting to room “{code}”…",
   "internetSync.joiningRoomToast": "Joining room “{code}”…",
   "internetSync.reconnectingRelayToast": "Reconnecting to relay…",
-  "internetSync.codeCopiedToast": "Room code copied"
+  "internetSync.codeCopiedToast": "Room code copied",
+  "restore.title": "Restore this snapshot?",
+  "restore.snapshotFrom": "the snapshot from {when}",
+  "restore.comparing": "Comparing it with your save…",
+  "restore.compareError": "Couldn't compare it with your save first ({error}). Restoring is still safe.",
+  "restore.identical": "Your save already matches this snapshot — restoring it would change nothing.",
+  "restore.unchanged": {
+    "one": "; 1 file stays as it is.",
+    "other": "; {n} files stay as they are."
+  },
+  "restore.changes": "changes",
+  "restore.comesBack": "comes back",
+  "restore.removed": "removed",
+  "restore.unplaced": "It also has files for {names}, which has no folder on this device; they are left out.",
+  "restore.safe": "Your current save is kept as a snapshot first, so this can be undone.",
+  "restore.anyway": "Restore anyway",
+  "restore.restore": "Restore"
 }
