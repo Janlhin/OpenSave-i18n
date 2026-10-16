@@ -342,5 +342,83 @@
   "pause.pauseFor": "Pause {when}",
   "pause.pauseTitle": "Stop syncing with your other devices for a while — snapshots are still taken",
   "pause.resume": "Resume syncing",
-  "pause.resumeTitle": "Syncing is paused {length}. Snapshots are still taken. Resume now to catch up."
+  "pause.resumeTitle": "Syncing is paused {length}. Snapshots are still taken. Resume now to catch up.",
+  "conflict.title": "Save conflict — {game}",
+  "conflict.desc": "Both this device and {peer} changed this save since the last sync. Pick which version to play from.",
+  "conflict.thisDevice": "This device",
+  "conflict.playedRecently": "played more recently",
+  "conflict.diffHere": {
+    "one": "{n} file differs here",
+    "other": "{n} files differ here"
+  },
+  "conflict.diffThere": {
+    "one": "{n} file differs there",
+    "other": "{n} files differ there"
+  },
+  "conflict.onlyHere": "{n} only on this device",
+  "conflict.onlyThere": "{n} only on {peer}",
+  "conflict.lastChange": "last change {time}",
+  "conflict.saveFolderEmpty": "save folder is empty",
+  "conflict.wholeSave": {
+    "one": "whole save: {n} file · {size}",
+    "other": "whole save: {n} files · {size}"
+  },
+  "conflict.diffCapped": "Counts above cover the first {shown} of {total} differing files.",
+  "conflict.keepMine": "Keep mine",
+  "conflict.keepTheirs": "Keep theirs",
+  "conflict.keepBoth": "Keep both (recommended)",
+  "conflict.keepBothName": "Keep both",
+  "conflict.consequenceKeepBoth": "{mine} / {both}: nothing is deleted.",
+  "conflict.broughtHere": {
+    "one": "The {n} file only on {peer} is brought here;",
+    "other": "The {n} files only on {peer} are brought here;"
+  },
+  "conflict.keptWhere": "where both have a file, yours is kept.",
+  "conflict.consequenceKeepTheirs": "{theirs}:",
+  "conflict.deletesFiles": {
+    "one": "deletes 1 file",
+    "other": "deletes {n} files"
+  },
+  "conflict.deletesTail": " that only this device has (snapshotted first).",
+  "conflict.deletesNothing": "nothing only this device has is lost.",
+  "conflict.diffToggle": {
+    "one": "What's different (1 file)",
+    "other": "What's different ({n} files)"
+  },
+  "conflict.diffMore": "…and {n} more",
+  "conflict.decideLater": "Decide later",
+  "conflict.decideLaterTitle": "Nothing of this game syncs until you decide. Open the game to decide.",
+  "conflict.keepTheirsTitle": {
+    "one": "Deletes 1 file only this device has",
+    "other": "Deletes {n} files only this device has"
+  },
+  "conflict.hintAll": "Nothing is lost whichever you pick. {both} (recommended) keeps playing yours — {peer} receives it too — and keeps {peer}'s version here on a branch you can switch to. {mine} makes your version the shared one — {peer} receives it (their old save is snapshotted first). {theirs} adopts {peer}'s version here, snapshotting yours first. Restore anything from the game's Snapshots / Branches tabs.",
+  "conflict.keepMineQuoted": "“Keep mine”",
+  "conflict.keepTheirsQuoted": "“Keep theirs”",
+  "conflict.keepBothQuoted": "“Keep both”",
+  "conflict.attentionBody": "Its save changed here and on another device at once — choose which to keep.",
+  "conflict.attentionToast": "Save conflict for “{name}” — choose which version to keep",
+  "conflict.applyingToast": "Applying your choice for “{name}” — transferring {peer}'s files…",
+  "conflict.differs": "differs",
+  "conflict.onlyOnPeer": "only on {peer}",
+  "conflict.onlyOnDevice": "only on this device",
+  "conflict.otherDevice": "the other device",
+  "conflict.aGame": "a game",
+  "conflict.unknown": "unknown",
+  "locConflict.title": "“{root}” folder — {game}",
+  "locConflict.desc": "This is one of {game}'s extra save folders, and it changed on both this device and {peer}. The game's main save is unaffected and keeps syncing; only this folder is waiting on you.",
+  "locConflict.changedRecently": "changed more recently",
+  "locConflict.folderEmpty": "folder is empty",
+  "locConflict.wholeFolder": {
+    "one": "whole folder: {n} file · {size}",
+    "other": "whole folder: {n} files · {size}"
+  },
+  "locConflict.attentionBody": "Its “{root}” folder differs on both devices — choose which to keep.",
+  "locConflict.attentionToast": "The “{root}” folder of “{game}” differs on both devices",
+  "locConflict.bringingToast": "Bringing {peer}'s “{root}” folder over…",
+  "locConflict.decideLaterTitle": "Nothing of this folder syncs until you decide. Open the game to decide.",
+  "locConflict.useTheirs": "Use {peer}'s",
+  "locConflict.useTheirsQuoted": "“Use {peer}'s”",
+  "locConflict.hintUndo": "A snapshot of every one of this game's folders is taken before either choice is applied, so both are undoable from the Snapshots tab. {mine} makes this device's copy the shared one and asks {peer} to take it — {peer} gets its own say if it has newer work. {theirs} brings their copy here.",
+  "locConflict.hintNoKeepBoth": "There is no “keep both” for a folder: that option puts the other copy on a branch, and branches cover the whole game rather than one of its folders."
 }
