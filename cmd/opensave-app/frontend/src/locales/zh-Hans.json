@@ -1154,5 +1154,7 @@
   "settings.appearance.theme": "主题",
   "settings.appearance.accent": "强调色",
   "settings.appearance.size": "大小",
-  "settings.appearance.animations": "动画"
+  "settings.appearance.animations": "动画",
+  "settings.appearance.animationsHint": "页面、对话框和游戏库进入视野时的细微移动效果，以及指向游戏时的反馈。",
+  "settings.appearance.reducedMotion": "暂时不会播放：Windows 正在要求应用减少动态效果。"
 }

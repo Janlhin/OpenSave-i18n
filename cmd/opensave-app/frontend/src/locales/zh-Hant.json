@@ -1154,5 +1154,7 @@
   "settings.appearance.theme": "主題",
   "settings.appearance.accent": "強調色",
   "settings.appearance.size": "大小",
-  "settings.appearance.animations": "動畫"
+  "settings.appearance.animations": "動畫",
+  "settings.appearance.animationsHint": "頁面、對話方塊和遊戲庫進入視野時的細微移動效果，以及指向遊戲時的反饋。",
+  "settings.appearance.reducedMotion": "暫時不會播放：Windows 正在要求應用減少動態效果。"
 }

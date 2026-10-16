@@ -66,12 +66,12 @@
 
 <label class="check motion">
   <input type="checkbox" checked={$appearance.motion} on:change={(e) => set({ motion: e.currentTarget.checked })} />
-  Animations
+  {$t('settings.appearance.animations')}
 </label>
 <p class="hint">
-  Small movements as pages, dialogs and your library come into view, and as you point at a game.
+  {$t('settings.appearance.animationsHint')}
   {#if $systemReducesMotion}
-    Off for now whatever this says: Windows is asking apps to reduce motion.
+    {$t('settings.appearance.reducedMotion')}
   {/if}
 </p>
 

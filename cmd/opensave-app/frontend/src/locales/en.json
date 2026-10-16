@@ -1313,5 +1313,7 @@
   "settings.appearance.theme": "Theme",
   "settings.appearance.accent": "Accent colour",
   "settings.appearance.size": "Size",
-  "settings.appearance.animations": "Animations"
+  "settings.appearance.animations": "Animations",
+  "settings.appearance.animationsHint": "Small movements as pages, dialogs and your library come into view, and as you point at a game.",
+  "settings.appearance.reducedMotion": "Off for now whatever this says: Windows is asking apps to reduce motion."
 }
