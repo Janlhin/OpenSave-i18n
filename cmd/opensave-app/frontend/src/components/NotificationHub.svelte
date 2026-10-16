@@ -10,7 +10,9 @@
   import { unfold } from '../lib/motion.js';
   import { api, gameCover } from '../lib/api.js';
   import { stateLoaded, games, conflicts, locationConflicts, pairingRequests, cloudOffers, newGames, navigate, activityTick, availableUpdate } from '../lib/stores.js';
-  import { waitingOnYou, happened, badgeCount, loadSeenAt, saveSeenAt, exampleEvents } from '../lib/notifications.js';
+  import { waitingOnYou, waitingText, happened, badgeCount, loadSeenAt, saveSeenAt, exampleEvents } from '../lib/notifications.js';
+  import { whenLabel } from '../lib/snapshots.js';
+  import { fmtSize } from '../lib/format.js';
   import { timeAgoParts } from '../lib/timeago.js';
   import { t } from '../lib/i18n.js';
 
@@ -21,6 +23,47 @@
     const { kind, ...params } = p;
     return { key: 'timeAgo.' + kind, params };
   };
+
+  // A say-piece ({key, params} or {text}) in the reader's words. Only ever
+  // called from the reactive statements below, so a language switch
+  // re-renders the panel.
+  const said = (s) => (s ? (s.key ? $t(s.key, s.params) : s.text) : '');
+
+  // The bell's happened-entries are built in lib/notifications.js's happened()
+  // out of describe() (lib/timeline.js), in English; the same kinds, in the
+  // same order, are mapped here to the catalog Timeline uses (see
+  // locales/en.json, "activity.event."), so the bell says them in the
+  // reader's language too. icon and tone stay the entry's.
+  function happenedSay(it, now, say) {
+    const loc = it.detail && it.kind !== 'restored' ? /^in its "(.+)" location$/.exec(it.detail) : null;
+    const where = !it.detail || it.kind === 'restored' ? '' : loc ? say('activity.event.inLocation', { root: loc[1] }) : ` ${it.detail}`;
+    const device = it.device ?? '';
+    switch (it.kind) {
+      case 'received':
+        return {
+          title: it.files ? { key: 'activity.event.received', params: { n: it.files, device, where } } : { key: 'activity.event.receivedAny', params: { device, where } },
+          detail: it.bytes ? { text: fmtSize(it.bytes) } : null
+        };
+      case 'deleted':
+        return { title: it.files ? { key: 'activity.event.deleted', params: { n: it.files, device, where } } : { key: 'activity.event.deletedAny', params: { device, where } }, detail: null };
+      case 'restored': {
+        const at = (it.detail ?? '').split('|')[1];
+        return { title: at ? { key: 'activity.event.restoredWhen', params: { when: whenLabel(at, new Date(now)) } } : { key: 'activity.event.restored', params: {} }, detail: null };
+      }
+      case 'cloud-pulled':
+        return { title: { key: 'activity.event.cloudPulled', params: { device } }, detail: null };
+      case 'emptied':
+        return { title: { key: 'activity.event.emptied', params: {} }, detail: it.files ? { key: 'activity.event.keptElsewhere', params: { n: it.files } } : null };
+      case 'conflict':
+        return { title: { key: 'activity.event.conflict', params: { device, where } }, detail: { key: 'activity.event.neededDecision', params: {} } };
+      default:
+        return null;
+    }
+  }
+
+  // happened() keeps a sentence that opens with a device's name as it is,
+  // and lowercases any other first word after the game's name — same here.
+  const lead = (text, device) => (device && text.startsWith(device) ? text : text[0].toLowerCase() + text.slice(1));
 
   let open = false;
   let items = [];
@@ -62,7 +105,39 @@
     newGames: $newGames,
     update: $availableUpdate
   });
+  // The same cases, said in the reader's language (lib/notifications.js's
+  // waitingText returns them in waitingOnYou's order).
+  $: waitingWords = waitingText(
+    {
+      games: $games,
+      conflicts: $conflicts,
+      locationConflicts: $locationConflicts,
+      pairingRequests: $pairingRequests,
+      cloudOffers: $cloudOffers,
+      newGames: $newGames,
+      update: $availableUpdate
+    },
+    $t
+  );
+  $: waitingShown = waiting.map((w, i) => ({ ...w, line: said(waitingWords[i]?.title), dline: said(waitingWords[i]?.detail) }));
   $: events = [...$exampleEvents, ...happened(items, $games, seenAt, now)];
+  // The raw activity items the bell's entries were built from, by their id
+  // (kind:gameId:atMs), so each entry's words can be said again localized.
+  $: rawById = new Map(items.map((it) => [`${it.kind}:${it.gameId}:${it.atMs}`, it]));
+  $: eventsShown = events.map((e) => {
+    if (e.example) {
+      const what = lead($t('activity.event.received', { n: 3, device: 'Steam Deck', where: '' }), 'Steam Deck');
+      return { ...e, line: $t('notifications.event.gameLine', { game: 'Hades', what }), detail: $t('notifications.example.detail') };
+    }
+    const it = rawById.get(e.id);
+    const s = it ? happenedSay(it, now, $t) : null;
+    const game = $games[e.gameId]?.name;
+    return {
+      ...e,
+      line: s && game ? $t('notifications.event.gameLine', { game, what: lead(said(s.title), it.device) }) : e.title,
+      detail: s ? (s.detail ? said(s.detail) : '') : e.detail
+    };
+  });
   $: count = badgeCount(waiting, events);
 
   // Opened and then closed, everything shown has been seen. Marked on
@@ -120,20 +195,20 @@
       <div class="scroll">
         {#if waiting.length}
           <div class="section">{$t('notifications.needsYou')}</div>
-          {#each waiting as w, i (w.id)}
+          {#each waitingShown as w, i (w.id)}
             <button class="item tone-{w.tone}" style="--i: {i}" on:click={() => go(w)}>
               {#if w.gameId && $games[w.gameId]}
                 <span class="thumb"><span class="initials">{initials($games[w.gameId].name)}</span><CoverImage src={gameCover($games[w.gameId])} alt="" /></span>
               {:else}
                 <span class="thumb icon"><svelte:component this={w.tone === 'warn' ? TriangleAlert : Info} size={15} /></span>
               {/if}
-              <span class="text"><span class="t">{w.title}</span><span class="d">{w.detail}</span></span>
+              <span class="text"><span class="t">{w.line}</span><span class="d">{w.dline}</span></span>
             </button>
           {/each}
         {/if}
         {#if events.length}
           <div class="section">{$t('notifications.earlier')}</div>
-          {#each events as e, i (e.id)}
+          {#each eventsShown as e, i (e.id)}
             {@const w = agoKey(iso(e.atMs), now)}
             <button class="item" class:unread={e.unread} style="--i: {Math.min(waiting.length + i, 10)}" on:click={() => go(e)}>
               {#if e.example}
@@ -142,7 +217,7 @@
                 <span class="thumb"><span class="initials">{initials($games[e.gameId]?.name)}</span><CoverImage src={gameCover($games[e.gameId])} alt="" /></span>
               {/if}
               <span class="text">
-                <span class="t">{e.title}</span>
+                <span class="t">{e.line}</span>
                 <span class="d">{e.detail ? `${e.detail} · ` : ''}{w.text ?? $t(w.key, w.params)}</span>
               </span>
               {#if e.unread}<span class="dot" aria-label={$t('notifications.unread')}></span>{/if}
